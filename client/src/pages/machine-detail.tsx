@@ -1,6 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useRoute, useLocation } from "wouter";
-import { api } from "@/lib/mockData";
+import { api } from "@/lib/api";
 import Layout from "@/components/Layout";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -36,14 +36,21 @@ export default function MachineDetailPage() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['machine', id] });
       toast({ title: "Policy Updated", description: "New USB policy applied successfully." });
+    },
+    onError: () => {
+      toast({ 
+        title: "Error", 
+        description: "Failed to update policy. Please try again.",
+        variant: "destructive"
+      });
     }
   });
 
   if (loadingMachine) return <Layout><div className="p-8">Loading...</div></Layout>;
   if (!machine) return <Layout><div className="p-8">Machine not found</div></Layout>;
 
-  const isLocked = machine.policy.lockAllUsb;
-  const tempUnlock = machine.policy.temporarilyUnlockedUntil;
+  const isLocked = machine.policy?.lockAllUsb || false;
+  const tempUnlock = machine.policy?.temporarilyUnlockedUntil;
   const isTempUnlocked = tempUnlock && new Date(tempUnlock) > new Date();
 
   return (

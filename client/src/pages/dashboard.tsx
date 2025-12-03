@@ -1,6 +1,6 @@
 import { Shield, AlertTriangle, Activity, Lock } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
-import { api } from "@/lib/mockData";
+import { api } from "@/lib/api";
 import Layout from "@/components/Layout";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { formatDistanceToNow } from "date-fns";
@@ -14,7 +14,7 @@ export default function DashboardPage() {
   // Calculate stats
   const totalMachines = machines?.length || 0;
   const onlineMachines = machines?.filter(m => m.status === 'online').length || 0;
-  const lockedMachines = machines?.filter(m => m.policy.lockAllUsb).length || 0;
+  const lockedMachines = machines?.filter(m => m.policy?.lockAllUsb).length || 0;
   
   // Mock aggregate stats
   const threatsBlocked = 12; // Mock value

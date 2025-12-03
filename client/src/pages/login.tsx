@@ -27,14 +27,27 @@ export default function LoginPage() {
     },
   });
 
-  function onSubmit(values: z.infer<typeof formSchema>) {
+  async function onSubmit(values: z.infer<typeof formSchema>) {
     setIsLoading(true);
-    // Simulate API call
-    setTimeout(() => {
-      localStorage.setItem("token", "mock-jwt-token");
-      setIsLoading(false);
+    try {
+      const response = await fetch('/api/admin/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(values)
+      });
+      
+      if (!response.ok) {
+        throw new Error('Login failed');
+      }
+      
+      const data = await response.json();
+      localStorage.setItem('token', data.token);
       setLocation("/dashboard");
-    }, 1000);
+    } catch (error) {
+      form.setError("password", { message: "Invalid credentials" });
+    } finally {
+      setIsLoading(false);
+    }
   }
 
   return (

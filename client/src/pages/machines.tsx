@@ -1,5 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { api, Machine } from "@/lib/mockData";
+import { api, type Machine } from "@/lib/api";
 import Layout from "@/components/Layout";
 import { Link } from "wouter";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -30,6 +30,13 @@ export default function MachinesPage() {
       toast({
         title: "Policy Updated",
         description: "Machine USB policy has been successfully updated.",
+      });
+    },
+    onError: () => {
+      toast({
+        title: "Error",
+        description: "Failed to update policy. Please try again.",
+        variant: "destructive"
       });
     }
   });
@@ -111,9 +118,10 @@ export default function MachinesPage() {
                       </TableCell>
                       <TableCell className="text-right">
                         <Switch 
-                          checked={machine.policy.lockAllUsb}
+                          checked={machine.policy?.lockAllUsb || false}
                           onCheckedChange={(checked) => toggleMutation.mutate({ id: machine.id, lockAllUsb: checked })}
                           data-testid={`switch-lock-${machine.id}`}
+                          disabled={!machine.policy}
                         />
                       </TableCell>
                     </TableRow>

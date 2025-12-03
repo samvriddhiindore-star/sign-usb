@@ -2,7 +2,7 @@ import Layout from "@/components/Layout";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { api } from "@/lib/mockData";
+import { api } from "@/lib/api";
 import { useQuery } from "@tanstack/react-query";
 import { format } from "date-fns";
 import { Search, Download, Filter } from "lucide-react";
@@ -11,20 +11,9 @@ import { Button } from "@/components/ui/button";
 import { useState } from "react";
 
 export default function LogsPage() {
-  // In a real app, we'd have a dedicated getAllLogs endpoint
-  // For mock, we'll just fetch logs for the known machines
-  const { data: machines } = useQuery({ queryKey: ['machines'], queryFn: api.getMachines });
-  
-  // This is a bit hacky for mock data, but works for the prototype
   const { data: allLogs } = useQuery({
-    queryKey: ['allLogs', machines],
-    queryFn: async () => {
-      if (!machines) return [];
-      const promises = machines.map(m => api.getLogs(m.id));
-      const results = await Promise.all(promises);
-      return results.flat().sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
-    },
-    enabled: !!machines
+    queryKey: ['allLogs'],
+    queryFn: api.getAllLogs
   });
 
   const [search, setSearch] = useState("");
