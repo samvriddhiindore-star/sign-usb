@@ -33,7 +33,7 @@ export default function LoginPage() {
     setTimeout(() => {
       localStorage.setItem("token", "mock-jwt-token");
       setIsLoading(false);
-      setLocation("/machines");
+      setLocation("/dashboard");
     }, 1000);
   }
 

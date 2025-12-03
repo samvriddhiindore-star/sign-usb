@@ -9,9 +9,9 @@ export default function Layout({ children }: { children: React.ReactNode }) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
   const navItems = [
+    { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
     { href: "/machines", label: "Machines", icon: HardDrive },
-    // { href: "/policies", label: "Policies", icon: Shield }, // Future
-    // { href: "/logs", label: "Audit Logs", icon: LayoutDashboard }, // Future
+    { href: "/logs", label: "Audit Logs", icon: Shield },
   ];
 
   return (

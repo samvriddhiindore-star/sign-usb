@@ -7,13 +7,17 @@ import NotFound from "@/pages/not-found";
 import LoginPage from "@/pages/login";
 import MachinesPage from "@/pages/machines";
 import MachineDetailPage from "@/pages/machine-detail";
+import DashboardPage from "@/pages/dashboard";
+import LogsPage from "@/pages/logs";
 
 function Router() {
   return (
     <Switch>
       <Route path="/login" component={LoginPage} />
+      <Route path="/dashboard" component={DashboardPage} />
       <Route path="/machines" component={MachinesPage} />
       <Route path="/machines/:id" component={MachineDetailPage} />
+      <Route path="/logs" component={LogsPage} />
       
       {/* Default Redirects */}
       <Route path="/">
