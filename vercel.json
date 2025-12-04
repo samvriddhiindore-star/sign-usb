@@ -1,0 +1,41 @@
+{
+  "name": "USB Sentinel",
+  "version": 2,
+  "public": true,
+  "buildCommand": "npm run build",
+  "outputDirectory": "dist",
+  "framework": "other",
+  "env": {
+    "DATABASE_URL": {
+      "description": "Neon PostgreSQL Connection String",
+      "required": true
+    },
+    "JWT_SECRET": {
+      "description": "JWT signing secret",
+      "required": true
+    },
+    "SESSION_SECRET": {
+      "description": "Session management secret",
+      "required": true
+    },
+    "NODE_ENV": {
+      "value": "production",
+      "required": true
+    }
+  },
+  "functions": {
+    "dist/index.cjs": {
+      "maxDuration": 60
+    }
+  },
+  "rewrites": [
+    {
+      "source": "/api/(.*)",
+      "destination": "/dist/index.cjs"
+    },
+    {
+      "source": "/(.*)",
+      "destination": "/dist/public/$1"
+    }
+  ]
+}
