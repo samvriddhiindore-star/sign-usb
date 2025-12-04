@@ -42,6 +42,14 @@ export interface LoginResponse {
   token: string;
 }
 
+export interface User {
+  id: number;
+  name: string;
+  email: string;
+  role: string;
+  createdAt: string;
+}
+
 export const api = {
   async login(email: string, password: string): Promise<LoginResponse> {
     const response = await fetch(`${API_BASE}/admin/login`, {
@@ -52,6 +60,75 @@ export const api = {
     
     if (!response.ok) {
       throw new Error('Login failed');
+    }
+    
+    return response.json();
+  },
+
+  // User Management
+  async getUsers(): Promise<User[]> {
+    const response = await fetch(`${API_BASE}/users`, {
+      headers: getAuthHeaders()
+    });
+    
+    if (!response.ok) {
+      throw new Error('Failed to fetch users');
+    }
+    
+    return response.json();
+  },
+
+  async getUser(id: number): Promise<User> {
+    const response = await fetch(`${API_BASE}/users/${id}`, {
+      headers: getAuthHeaders()
+    });
+    
+    if (!response.ok) {
+      throw new Error('Failed to fetch user');
+    }
+    
+    return response.json();
+  },
+
+  async createUser(data: { name: string; email: string; password: string; role?: string }): Promise<User> {
+    const response = await fetch(`${API_BASE}/users`, {
+      method: 'POST',
+      headers: getAuthHeaders(),
+      body: JSON.stringify(data)
+    });
+    
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.error || 'Failed to create user');
+    }
+    
+    return response.json();
+  },
+
+  async updateUser(id: number, data: { name?: string; email?: string; role?: string }): Promise<User> {
+    const response = await fetch(`${API_BASE}/users/${id}`, {
+      method: 'PUT',
+      headers: getAuthHeaders(),
+      body: JSON.stringify(data)
+    });
+    
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.error || 'Failed to update user');
+    }
+    
+    return response.json();
+  },
+
+  async deleteUser(id: number): Promise<{ success: boolean }> {
+    const response = await fetch(`${API_BASE}/users/${id}`, {
+      method: 'DELETE',
+      headers: getAuthHeaders()
+    });
+    
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.error || 'Failed to delete user');
     }
     
     return response.json();

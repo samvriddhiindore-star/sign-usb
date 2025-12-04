@@ -21,6 +21,10 @@ export interface IStorage {
   // Admins
   getAdminByEmail(email: string): Promise<Admin | undefined>;
   createAdmin(admin: InsertAdmin): Promise<Admin>;
+  getAdmins(): Promise<Admin[]>;
+  getAdmin(id: number): Promise<Admin | undefined>;
+  updateAdmin(id: number, updates: Partial<Admin>): Promise<Admin | undefined>;
+  deleteAdmin(id: number): Promise<boolean>;
   
   // Machines
   getMachines(): Promise<MachineWithPolicy[]>;
@@ -50,6 +54,25 @@ class DatabaseStorage implements IStorage {
   async createAdmin(admin: InsertAdmin): Promise<Admin> {
     const result = await db.insert(admins).values(admin).returning();
     return result[0];
+  }
+
+  async getAdmins(): Promise<Admin[]> {
+    return await db.select().from(admins).orderBy(desc(admins.createdAt));
+  }
+
+  async getAdmin(id: number): Promise<Admin | undefined> {
+    const result = await db.select().from(admins).where(eq(admins.id, id)).limit(1);
+    return result[0];
+  }
+
+  async updateAdmin(id: number, updates: Partial<Admin>): Promise<Admin | undefined> {
+    const result = await db.update(admins).set(updates).where(eq(admins.id, id)).returning();
+    return result[0];
+  }
+
+  async deleteAdmin(id: number): Promise<boolean> {
+    const result = await db.delete(admins).where(eq(admins.id, id));
+    return result.rowCount !== undefined ? result.rowCount > 0 : true;
   }
 
   async getMachines(): Promise<MachineWithPolicy[]> {

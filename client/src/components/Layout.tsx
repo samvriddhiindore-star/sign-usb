@@ -1,5 +1,5 @@
 import { Link, useLocation } from "wouter";
-import { Shield, LayoutDashboard, HardDrive, LogOut, Menu } from "lucide-react";
+import { Shield, LayoutDashboard, HardDrive, LogOut, Menu, Users } from "lucide-react";
 import { cn } from "@/lib/utils";
 import logo from "@assets/generated_images/abstract_cybersecurity_shield_logo.png";
 import { useState } from "react";
@@ -12,6 +12,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
     { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
     { href: "/machines", label: "Machines", icon: HardDrive },
     { href: "/logs", label: "Audit Logs", icon: Shield },
+    { href: "/users", label: "Users", icon: Users },
   ];
 
   return (

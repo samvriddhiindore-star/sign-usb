@@ -89,6 +89,154 @@ export async function registerRoutes(
     }
   });
 
+  // User Management (Protected Routes)
+  app.get("/api/users", authMiddleware, async (req, res) => {
+    try {
+      const users = await storage.getAdmins();
+      res.json(users.map(u => ({
+        id: u.id,
+        name: u.name,
+        email: u.email,
+        role: u.role,
+        createdAt: u.createdAt.toISOString()
+      })));
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.get("/api/users/:id", authMiddleware, async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) {
+        return res.status(400).json({ error: "Invalid user ID" });
+      }
+      
+      const user = await storage.getAdmin(id);
+      if (!user) {
+        return res.status(404).json({ error: "User not found" });
+      }
+      
+      res.json({
+        id: user.id,
+        name: user.name,
+        email: user.email,
+        role: user.role,
+        createdAt: user.createdAt.toISOString()
+      });
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.post("/api/users", authMiddleware, async (req, res) => {
+    try {
+      const schema = z.object({
+        name: z.string().min(2),
+        email: z.string().email(),
+        password: z.string().min(6),
+        role: z.enum(["admin", "user"]).optional()
+      });
+      
+      const data = schema.parse(req.body);
+      
+      const existing = await storage.getAdminByEmail(data.email);
+      if (existing) {
+        return res.status(400).json({ error: "Email already exists" });
+      }
+      
+      const passwordHash = await hashPassword(data.password);
+      const user = await storage.createAdmin({
+        name: data.name,
+        email: data.email,
+        passwordHash,
+        role: data.role || "user"
+      });
+      
+      res.status(201).json({
+        id: user.id,
+        name: user.name,
+        email: user.email,
+        role: user.role,
+        createdAt: user.createdAt.toISOString()
+      });
+    } catch (error: any) {
+      res.status(400).json({ error: error.message });
+    }
+  });
+
+  app.put("/api/users/:id", authMiddleware, async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) {
+        return res.status(400).json({ error: "Invalid user ID" });
+      }
+      
+      const schema = z.object({
+        name: z.string().min(2).optional(),
+        email: z.string().email().optional(),
+        role: z.enum(["admin", "user"]).optional()
+      });
+      
+      const data = schema.parse(req.body);
+      
+      const user = await storage.getAdmin(id);
+      if (!user) {
+        return res.status(404).json({ error: "User not found" });
+      }
+      
+      if (data.email && data.email !== user.email) {
+        const existing = await storage.getAdminByEmail(data.email);
+        if (existing) {
+          return res.status(400).json({ error: "Email already exists" });
+        }
+      }
+      
+      const updated = await storage.updateAdmin(id, {
+        name: data.name || user.name,
+        email: data.email || user.email,
+        role: data.role || user.role
+      });
+      
+      if (!updated) {
+        return res.status(500).json({ error: "Failed to update user" });
+      }
+      
+      res.json({
+        id: updated.id,
+        name: updated.name,
+        email: updated.email,
+        role: updated.role,
+        createdAt: updated.createdAt.toISOString()
+      });
+    } catch (error: any) {
+      res.status(400).json({ error: error.message });
+    }
+  });
+
+  app.delete("/api/users/:id", authMiddleware, async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) {
+        return res.status(400).json({ error: "Invalid user ID" });
+      }
+      
+      const user = await storage.getAdmin(id);
+      if (!user) {
+        return res.status(404).json({ error: "User not found" });
+      }
+      
+      const success = await storage.deleteAdmin(id);
+      if (!success) {
+        return res.status(500).json({ error: "Failed to delete user" });
+      }
+      
+      res.json({ success: true, message: "User deleted successfully" });
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
   // Machine Management (Protected Routes)
   app.get("/api/machines", authMiddleware, async (req, res) => {
     try {

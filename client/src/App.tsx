@@ -9,6 +9,7 @@ import MachinesPage from "@/pages/machines";
 import MachineDetailPage from "@/pages/machine-detail";
 import DashboardPage from "@/pages/dashboard";
 import LogsPage from "@/pages/logs";
+import UsersPage from "@/pages/users";
 
 function Router() {
   return (
@@ -18,6 +19,7 @@ function Router() {
       <Route path="/machines" component={MachinesPage} />
       <Route path="/machines/:id" component={MachineDetailPage} />
       <Route path="/logs" component={LogsPage} />
+      <Route path="/users" component={UsersPage} />
       
       {/* Default Redirects */}
       <Route path="/">
