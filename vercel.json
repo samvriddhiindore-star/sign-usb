@@ -1,7 +1,0 @@
-{
-  "name": "USB Sentinel",
-  "version": 2,
-  "public": true,
-  "buildCommand": "npm run build",
-  "outputDirectory": "dist/public"
-}
