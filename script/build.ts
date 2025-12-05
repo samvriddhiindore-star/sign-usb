@@ -1,6 +1,7 @@
 import { build as esbuild } from "esbuild";
 import { build as viteBuild } from "vite";
-import { rm, readFile } from "fs/promises";
+import { rm, readFile, mkdir } from "fs/promises";
+import path from "path";
 
 // server deps to bundle to reduce openat(2) syscalls
 // which helps cold start times
@@ -46,6 +47,7 @@ async function buildAll() {
   ];
   const externals = allDeps.filter((dep) => !allowlist.includes(dep));
 
+  // Build for Node.js production
   await esbuild({
     entryPoints: ["server/index.ts"],
     platform: "node",
@@ -56,6 +58,24 @@ async function buildAll() {
       "process.env.NODE_ENV": '"production"',
     },
     minify: true,
+    external: externals,
+    logLevel: "info",
+  });
+
+  // Build for Vercel serverless function
+  console.log("building vercel api handler...");
+  await mkdir("dist/api", { recursive: true });
+  
+  await esbuild({
+    entryPoints: ["api/index.ts"],
+    platform: "node",
+    bundle: true,
+    format: "esm",
+    outfile: "dist/api/index.js",
+    define: {
+      "process.env.NODE_ENV": '"production"',
+    },
+    minify: false,
     external: externals,
     logLevel: "info",
   });
