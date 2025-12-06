@@ -1,7 +1,7 @@
 import { type Express } from "express";
 import { createServer as createViteServer, createLogger } from "vite";
 import { type Server } from "http";
-import viteConfig from "../vite.config";
+import viteConfig from "../../vite.config";
 import fs from "fs";
 import path from "path";
 import { fileURLToPath } from "url";
@@ -39,7 +39,7 @@ export async function setupVite(server: Server, app: Express) {
       const __filename = fileURLToPath(import.meta.url);
       const __dirname = path.dirname(__filename);
 
-      const clientTemplate = path.resolve(__dirname, "..", "client", "index.html");
+      const clientTemplate = path.resolve(__dirname, "../../", "frontend", "client", "index.html");
 
       // always reload the index.html file from disk incase it changes
       let template = await fs.promises.readFile(clientTemplate, "utf-8");

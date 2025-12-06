@@ -49,7 +49,7 @@ async function buildAll() {
 
   // Build for Node.js production
   await esbuild({
-    entryPoints: ["server/index.ts"],
+    entryPoints: ["backend/server/index.ts"],
     platform: "node",
     bundle: true,
     format: "cjs",

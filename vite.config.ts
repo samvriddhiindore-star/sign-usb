@@ -16,8 +16,8 @@ export default defineConfig({
   ],
   resolve: {
     alias: {
-      "@": path.resolve(__dirname, "client", "src"),
-      "@shared": path.resolve(__dirname, "shared"),
+      "@": path.resolve(__dirname, "frontend", "client", "src"),
+      "@shared": path.resolve(__dirname, "backend", "shared"),
       "@assets": path.resolve(__dirname, "attached_assets"),
     },
   },
@@ -31,7 +31,7 @@ export default defineConfig({
   // then path.dirname gives the directory of this config file
   // (equivalent to __dirname in CommonJS)
   // Note: keep this below the imports so fileURLToPath is available.
-  root: path.resolve(__dirname, "client"),
+  root: path.resolve(__dirname, "frontend", "client"),
   build: {
     outDir: path.resolve(__dirname, "dist/public"),
     emptyOutDir: true,

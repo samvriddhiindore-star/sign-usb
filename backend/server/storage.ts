@@ -13,7 +13,7 @@ import {
   type InsertUsbLog,
   type InsertAdmin,
   type MachineWithPolicy
-} from "@shared/schema";
+} from "../shared/schema";
 import { eq, desc, and } from "drizzle-orm";
 import bcrypt from "bcryptjs";
 
