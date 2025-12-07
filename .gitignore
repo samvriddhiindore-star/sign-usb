@@ -1,0 +1,15 @@
+node_modules
+dist
+.DS_Store
+server/public
+vite.config.ts.*
+*.tar.gz
+.env
+.env.local
+.local/
+*.log
+.vscode/
+.idea/
+seed_admin.js
+seed_admin.ts
+verify_tables.ts
