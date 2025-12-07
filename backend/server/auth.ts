@@ -3,6 +3,7 @@ import bcrypt from "bcryptjs";
 import type { Request, Response, NextFunction } from "express";
 
 const JWT_SECRET = process.env.JWT_SECRET || "usb-sentinel-secret-change-in-production";
+const AGENT_JWT_SECRET = process.env.AGENT_JWT_SECRET || JWT_SECRET;
 
 export interface JWTPayload {
   adminId: number;
@@ -17,6 +18,28 @@ export function generateToken(payload: JWTPayload): string {
 export function verifyToken(token: string): JWTPayload | null {
   try {
     return jwt.verify(token, JWT_SECRET) as JWTPayload;
+  } catch (error) {
+    return null;
+  }
+}
+
+export interface AgentJWTPayload {
+  agentId: string;
+  iat?: number;
+  exp?: number;
+}
+
+/**
+ * Generate a JWT for an agent. Use a separate secret `AGENT_JWT_SECRET` if set.
+ */
+export function generateAgentToken(agentId: string, expiresIn = "30d"): string {
+  const payload: AgentJWTPayload = { agentId };
+  return jwt.sign(payload as any, AGENT_JWT_SECRET, { expiresIn });
+}
+
+export function verifyAgentToken(token: string): AgentJWTPayload | null {
+  try {
+    return jwt.verify(token, AGENT_JWT_SECRET) as AgentJWTPayload;
   } catch (error) {
     return null;
   }

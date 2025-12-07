@@ -43,6 +43,15 @@ export const usbLogs = pgTable("usb_logs", {
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
+export const agentTokens = pgTable("agent_tokens", {
+  id: serial("id").primaryKey(),
+  agentId: text("agent_id").notNull(),
+  token: text("token").notNull(),
+  revoked: boolean("revoked").notNull().default(false),
+  expiresAt: timestamp("expires_at"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
 // Insert Schemas
 export const insertAdminSchema = createInsertSchema(admins).omit({
   id: true,
@@ -66,17 +75,24 @@ export const insertUsbLogSchema = createInsertSchema(usbLogs).omit({
   createdAt: true,
 });
 
+export const insertAgentTokenSchema = createInsertSchema(agentTokens).omit({
+  id: true,
+  createdAt: true,
+});
+
 // Select Types
 export type Admin = typeof admins.$inferSelect;
 export type Machine = typeof machines.$inferSelect;
 export type Policy = typeof policies.$inferSelect;
 export type UsbLog = typeof usbLogs.$inferSelect;
+export type AgentToken = typeof agentTokens.$inferSelect;
 
 // Insert Types
 export type InsertAdmin = z.infer<typeof insertAdminSchema>;
 export type InsertMachine = z.infer<typeof insertMachineSchema>;
 export type InsertPolicy = z.infer<typeof insertPolicySchema>;
 export type InsertUsbLog = z.infer<typeof insertUsbLogSchema>;
+export type InsertAgentToken = z.infer<typeof insertAgentTokenSchema>;
 
 // Combined types for API responses
 export type MachineWithPolicy = Machine & {

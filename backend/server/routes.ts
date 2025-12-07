@@ -2,7 +2,7 @@ import type { Express } from "express";
 import type { Server as HTTPServer } from "http";
 import { storage } from "./storage";
 import { setupSignalRHub, sendCommandToAgent } from "./signalr-hub";
-import { generateToken, hashPassword, comparePassword, authMiddleware } from "./auth";
+import { generateToken, generateAgentToken, hashPassword, comparePassword, authMiddleware } from "./auth";
 import { z } from "zod";
 import type { Server as SocketIOServer } from "socket.io";
 
@@ -404,6 +404,68 @@ export async function registerRoutes(
         eventType: log.eventType,
         status: log.status,
         createdAt: log.createdAt.toISOString()
+      })));
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // Agent token management (Admin only)
+  app.post("/api/agents/:agentId/token", authMiddleware, async (req, res) => {
+    try {
+      const agentId = req.params.agentId;
+      const schema = z.object({ expiresInSeconds: z.number().optional() });
+      const data = schema.parse(req.body);
+
+      const expiresIn = data.expiresInSeconds ? `${data.expiresInSeconds}s` : undefined;
+      const token = generateAgentToken(agentId, expiresIn);
+
+      const expiresAt = data.expiresInSeconds ? new Date(Date.now() + data.expiresInSeconds * 1000) : null;
+
+      await storage.createAgentToken({ agentId, token, revoked: false, expiresAt: expiresAt || null });
+
+      res.status(201).json({ token, expiresAt: expiresAt ? expiresAt.toISOString() : null });
+    } catch (error: any) {
+      res.status(400).json({ error: error.message });
+    }
+  });
+
+  app.delete("/api/agents/:agentId/token", authMiddleware, async (req, res) => {
+    try {
+      const agentId = req.params.agentId;
+      const schema = z.object({ token: z.string().optional(), revokeAll: z.boolean().optional() });
+      const data = schema.parse(req.body);
+
+      if (data.revokeAll) {
+        const count = await storage.revokeAgentTokensByAgentId(agentId);
+        return res.json({ success: true, revoked: count });
+      }
+
+      if (!data.token) {
+        return res.status(400).json({ error: "token is required unless revokeAll=true" });
+      }
+
+      const ok = await storage.revokeAgentTokenByToken(data.token);
+      return res.json({ success: ok });
+    } catch (error: any) {
+      res.status(400).json({ error: error.message });
+    }
+  });
+
+  // List tokens for an agent (Admin only)
+  app.get("/api/agents/:agentId/tokens", authMiddleware, async (req, res) => {
+    try {
+      const agentId = req.params.agentId;
+      const limit = req.query.limit ? parseInt(req.query.limit as string) : 100;
+      const tokens = await storage.getAgentTokensByAgentId(agentId, limit);
+
+      res.json(tokens.map(t => ({
+        id: t.id.toString(),
+        agentId: t.agentId,
+        token: t.token,
+        revoked: t.revoked,
+        expiresAt: t.expiresAt ? t.expiresAt.toISOString() : null,
+        createdAt: t.createdAt.toISOString()
       })));
     } catch (error: any) {
       res.status(500).json({ error: error.message });

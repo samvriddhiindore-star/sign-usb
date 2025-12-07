@@ -2,6 +2,7 @@ import { Server as SocketIOServer } from "socket.io";
 import type { Server as HTTPServer } from "http";
 import { storage } from "./storage";
 import { log } from "./index";
+import { verifyAgentToken } from "./auth";
 
 interface AgentSocket {
   id: string;
@@ -10,6 +11,27 @@ interface AgentSocket {
 }
 
 const connectedAgents = new Map<string, AgentSocket>();
+
+// Simple in-memory cache for revoked tokens (TTL = 60s for performance)
+const revokedTokenCache = new Map<string, boolean>();
+const TOKEN_CACHE_TTL_MS = 60000;
+
+async function isTokenRevoked(token: string): Promise<boolean> {
+  // Check in-memory cache first
+  if (revokedTokenCache.has(token)) {
+    return revokedTokenCache.get(token) || false;
+  }
+
+  // Query storage to check if token is revoked
+  const storedToken = await storage.getAgentToken(token);
+  const revoked = !storedToken || storedToken.revoked || (storedToken.expiresAt && storedToken.expiresAt < new Date());
+
+  // Cache result for TTL
+  revokedTokenCache.set(token, revoked);
+  setTimeout(() => revokedTokenCache.delete(token), TOKEN_CACHE_TTL_MS);
+
+  return revoked;
+}
 
 export function setupSignalRHub(httpServer: HTTPServer) {
   const io = new SocketIOServer(httpServer, {
@@ -20,8 +42,63 @@ export function setupSignalRHub(httpServer: HTTPServer) {
     path: "/agent-hub"
   });
 
+  const agentAuthRequired = process.env.AGENT_AUTH_REQUIRED !== "false";
+
   io.on("connection", (socket) => {
-    log(`Agent attempting connection: ${socket.id}`, "signalr");
+    // Validate agent token sent in the Socket.IO auth handshake (if required)
+    let token: string | undefined;
+    let agentPayload: any;
+
+    if (agentAuthRequired) {
+      const handshakeAuth: any = (socket.handshake as any).auth || {};
+      const handshakeHeaders: any = (socket.handshake as any).headers || {};
+      // allow token in auth.token or Authorization header
+      token = handshakeAuth.token;
+      if (!token && typeof handshakeHeaders.authorization === "string") {
+        const authHeader: string = handshakeHeaders.authorization;
+        if (authHeader.startsWith("Bearer ")) {
+          token = authHeader.substring(7);
+        }
+      }
+
+      if (!token) {
+        log(`Agent connection rejected (no token): ${socket.id}`, "signalr");
+        socket.emit("Error", { message: "No agent token provided" });
+        socket.disconnect(true);
+        return;
+      }
+
+      agentPayload = verifyAgentToken(token);
+      if (!agentPayload || !agentPayload.agentId) {
+        log(`Agent connection rejected (invalid token): ${socket.id}`, "signalr");
+        socket.emit("Error", { message: "Invalid agent token" });
+        socket.disconnect(true);
+        return;
+      }
+
+      // attach verified agentId to socket for later checks
+      (socket as any).agentFromToken = agentPayload.agentId;
+      (socket as any).agentToken = token;
+    }
+
+    log(`Agent attempting connection: ${socket.id}${agentPayload ? ` (agentId=${agentPayload.agentId})` : ""}`, "signalr");
+
+    // Helper to check token revocation before processing any event (only if auth is required)
+    const validateTokenNotRevoked = async (eventName: string): Promise<boolean> => {
+      if (!agentAuthRequired) {
+        return true;
+      }
+
+      const currentToken = (socket as any).agentToken;
+      const revoked = await isTokenRevoked(currentToken);
+      if (revoked) {
+        log(`Agent token revoked (${eventName}): ${socket.id} (agentId=${(socket as any).agentFromToken})`, "signalr");
+        socket.emit("Error", { message: "Agent token has been revoked" });
+        socket.disconnect(true);
+        return false;
+      }
+      return true;
+    };
     
     socket.on("Register", async (data: { 
       agentId: string,
@@ -31,6 +108,17 @@ export function setupSignalRHub(httpServer: HTTPServer) {
       ipAddress?: string 
     }) => {
       try {
+        // Check token revocation before processing Register
+        if (!(await validateTokenNotRevoked("Register"))) return;
+
+        // Ensure the agentId in the Register payload matches the agentId in the token
+        const tokenAgentId = (socket as any).agentFromToken;
+        if (tokenAgentId && tokenAgentId !== data.agentId) {
+          log(`Agent registration rejected: token agentId mismatch (${tokenAgentId} != ${data.agentId})`, "signalr");
+          socket.emit("Error", { message: "AgentId does not match token" });
+          return;
+        }
+
         log(`Agent registering: ${data.agentId} (${data.hostname})`, "signalr");
         
         let machine = await storage.getMachineByAgentId(data.agentId);
@@ -95,6 +183,9 @@ export function setupSignalRHub(httpServer: HTTPServer) {
       memoryUsage?: number 
     }) => {
       try {
+        // Check token revocation before processing Heartbeat
+        if (!(await validateTokenNotRevoked("Heartbeat"))) return;
+
         const machine = await storage.getMachineByAgentId(data.agentId);
         if (machine) {
           await storage.updateMachine(machine.id, {
@@ -118,6 +209,9 @@ export function setupSignalRHub(httpServer: HTTPServer) {
       status: "allowed" | "blocked"
     }) => {
       try {
+        // Check token revocation before processing UsbEvent
+        if (!(await validateTokenNotRevoked("UsbEvent"))) return;
+
         const machine = await storage.getMachineByAgentId(data.agentId);
         if (machine) {
           await storage.createLog({
@@ -138,6 +232,9 @@ export function setupSignalRHub(httpServer: HTTPServer) {
 
     socket.on("GetStatus", async (data: { agentId: string }) => {
       try {
+        // Check token revocation before processing GetStatus
+        if (!(await validateTokenNotRevoked("GetStatus"))) return;
+
         const machine = await storage.getMachineByAgentId(data.agentId);
         if (machine) {
           const policy = await storage.getPolicy(machine.id);

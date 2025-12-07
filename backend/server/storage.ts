@@ -4,6 +4,7 @@ import {
   policies, 
   usbLogs, 
   admins,
+  agentTokens,
   type Machine, 
   type Policy, 
   type UsbLog,
@@ -13,6 +14,9 @@ import {
   type InsertUsbLog,
   type InsertAdmin,
   type MachineWithPolicy
+  ,
+  type AgentToken,
+  type InsertAgentToken
 } from "../shared/schema";
 import { eq, desc, and } from "drizzle-orm";
 import bcrypt from "bcryptjs";
@@ -43,6 +47,12 @@ export interface IStorage {
   getLogs(machineId: number, limit?: number): Promise<UsbLog[]>;
   getAllLogs(limit?: number): Promise<UsbLog[]>;
   createLog(log: InsertUsbLog): Promise<UsbLog>;
+  // Agent tokens
+  createAgentToken(token: InsertAgentToken): Promise<AgentToken>;
+  revokeAgentTokenByToken(token: string): Promise<boolean>;
+  revokeAgentTokensByAgentId(agentId: string): Promise<number>;
+  getAgentToken(token: string): Promise<AgentToken | undefined>;
+  getAgentTokensByAgentId(agentId: string, limit?: number): Promise<AgentToken[]>;
 }
 
 class DatabaseStorage implements IStorage {
@@ -160,6 +170,30 @@ class DatabaseStorage implements IStorage {
   async createLog(log: InsertUsbLog): Promise<UsbLog> {
     const result = await db.insert(usbLogs).values(log).returning();
     return result[0];
+  }
+
+  async createAgentToken(token: InsertAgentToken): Promise<AgentToken> {
+    const result = await db.insert(agentTokens).values(token).returning();
+    return result[0];
+  }
+
+  async revokeAgentTokenByToken(token: string): Promise<boolean> {
+    const result = await db.update(agentTokens).set({ revoked: true }).where(eq(agentTokens.token, token));
+    return result.rowCount !== undefined ? result.rowCount > 0 : true;
+  }
+
+  async revokeAgentTokensByAgentId(agentId: string): Promise<number> {
+    const result = await db.update(agentTokens).set({ revoked: true }).where(eq(agentTokens.agentId, agentId));
+    return result.rowCount ?? 0;
+  }
+
+  async getAgentToken(token: string): Promise<AgentToken | undefined> {
+    const result = await db.select().from(agentTokens).where(eq(agentTokens.token, token)).limit(1);
+    return result[0];
+  }
+
+  async getAgentTokensByAgentId(agentId: string, limit: number = 100): Promise<AgentToken[]> {
+    return await db.select().from(agentTokens).where(eq(agentTokens.agentId, agentId)).orderBy(desc(agentTokens.createdAt)).limit(limit);
   }
 }
 
