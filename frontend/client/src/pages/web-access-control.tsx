@@ -1,0 +1,442 @@
+import { useState } from "react";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { api, UrlEntry } from "@/lib/api";
+import Layout from "@/components/Layout";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import {
+  Dialog, DialogContent, DialogDescription, DialogFooter,
+  DialogHeader, DialogTitle, DialogTrigger
+} from "@/components/ui/dialog";
+import { 
+  Table, TableBody, TableCell, TableHead, 
+  TableHeader, TableRow 
+} from "@/components/ui/table";
+import {
+  DropdownMenu, DropdownMenuContent, DropdownMenuItem,
+  DropdownMenuTrigger
+} from "@/components/ui/dropdown-menu";
+import { 
+  Globe, GlobeLock, Plus, RefreshCw, MoreHorizontal, 
+  Edit, Trash2, Loader2, Search, Check, X, Shield
+} from "lucide-react";
+import { formatDistanceToNow } from "date-fns";
+import { useToast } from "@/hooks/use-toast";
+
+export default function WebAccessControlPage() {
+  const [isCreateOpen, setIsCreateOpen] = useState(false);
+  const [editUrl, setEditUrl] = useState<UrlEntry | null>(null);
+  const [formData, setFormData] = useState({ url: '', access: 'blocked' as 'allowed' | 'blocked' });
+  const [searchTerm, setSearchTerm] = useState("");
+  const [accessFilter, setAccessFilter] = useState<'all' | 'allowed' | 'blocked'>('all');
+  
+  const queryClient = useQueryClient();
+  const { toast } = useToast();
+
+  const { data: urls, isLoading, refetch } = useQuery({
+    queryKey: ['urls'],
+    queryFn: api.getUrls
+  });
+
+  const createMutation = useMutation({
+    mutationFn: api.createUrl,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['urls'] });
+      queryClient.invalidateQueries({ queryKey: ['dashboard-stats'] });
+      setIsCreateOpen(false);
+      setFormData({ url: '', access: 'blocked' });
+      toast({ title: "URL added successfully" });
+    },
+    onError: () => {
+      toast({ title: "Failed to add URL", variant: "destructive" });
+    }
+  });
+
+  const updateMutation = useMutation({
+    mutationFn: ({ id, data }: { id: number; data: Partial<UrlEntry> }) =>
+      api.updateUrl(id, data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['urls'] });
+      queryClient.invalidateQueries({ queryKey: ['dashboard-stats'] });
+      setEditUrl(null);
+      toast({ title: "URL updated successfully" });
+    },
+    onError: () => {
+      toast({ title: "Failed to update URL", variant: "destructive" });
+    }
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: api.deleteUrl,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['urls'] });
+      queryClient.invalidateQueries({ queryKey: ['dashboard-stats'] });
+      toast({ title: "URL deleted successfully" });
+    },
+    onError: () => {
+      toast({ title: "Failed to delete URL", variant: "destructive" });
+    }
+  });
+
+  const toggleAccessMutation = useMutation({
+    mutationFn: ({ id, access }: { id: number; access: 'allowed' | 'blocked' }) =>
+      api.updateUrl(id, { access }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['urls'] });
+      queryClient.invalidateQueries({ queryKey: ['dashboard-stats'] });
+      toast({ title: "Access updated" });
+    },
+    onError: () => {
+      toast({ title: "Failed to update access", variant: "destructive" });
+    }
+  });
+
+  // Filter URLs
+  const filteredUrls = urls?.filter(url => {
+    const matchesSearch = url.url.toLowerCase().includes(searchTerm.toLowerCase());
+    const matchesAccess = accessFilter === 'all' || url.access === accessFilter;
+    return matchesSearch && matchesAccess;
+  }) || [];
+
+  const handleCreate = () => {
+    if (!formData.url.trim()) return;
+    createMutation.mutate(formData);
+  };
+
+  const handleUpdate = () => {
+    if (!editUrl || !formData.url.trim()) return;
+    updateMutation.mutate({ 
+      id: editUrl.id, 
+      data: { url: formData.url, access: formData.access }
+    });
+  };
+
+  const openEditDialog = (url: UrlEntry) => {
+    setFormData({ url: url.url, access: url.access });
+    setEditUrl(url);
+  };
+
+  // Stats
+  const allowedCount = urls?.filter(u => u.access === 'allowed').length || 0;
+  const blockedCount = urls?.filter(u => u.access === 'blocked').length || 0;
+
+  return (
+    <Layout>
+      <div className="space-y-6">
+        {/* Header */}
+        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+          <div>
+            <h1 className="text-3xl font-bold tracking-tight">Website Access Control</h1>
+            <p className="text-muted-foreground mt-1">Manage allowed and blocked websites.</p>
+          </div>
+          <div className="flex gap-2">
+            <Dialog open={isCreateOpen} onOpenChange={setIsCreateOpen}>
+              <DialogTrigger asChild>
+                <Button onClick={() => setFormData({ url: '', access: 'blocked' })}>
+                  <Plus className="h-4 w-4 mr-2" />
+                  Add URL
+                </Button>
+              </DialogTrigger>
+              <DialogContent>
+                <DialogHeader>
+                  <DialogTitle>Add Website</DialogTitle>
+                  <DialogDescription>
+                    Add a new URL to allow or block.
+                  </DialogDescription>
+                </DialogHeader>
+                <div className="space-y-4 py-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="url">Website URL</Label>
+                    <Input
+                      id="url"
+                      value={formData.url}
+                      onChange={(e) => setFormData(prev => ({ ...prev, url: e.target.value }))}
+                      placeholder="e.g., example.com"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Access</Label>
+                    <div className="flex gap-2">
+                      <Button
+                        type="button"
+                        variant={formData.access === 'allowed' ? 'default' : 'outline'}
+                        onClick={() => setFormData(prev => ({ ...prev, access: 'allowed' }))}
+                        className={formData.access === 'allowed' ? 'bg-emerald-600 hover:bg-emerald-700' : ''}
+                      >
+                        <Check className="h-4 w-4 mr-1" />
+                        Allow
+                      </Button>
+                      <Button
+                        type="button"
+                        variant={formData.access === 'blocked' ? 'default' : 'outline'}
+                        onClick={() => setFormData(prev => ({ ...prev, access: 'blocked' }))}
+                        className={formData.access === 'blocked' ? 'bg-rose-600 hover:bg-rose-700' : ''}
+                      >
+                        <X className="h-4 w-4 mr-1" />
+                        Block
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+                <DialogFooter>
+                  <Button variant="outline" onClick={() => setIsCreateOpen(false)}>
+                    Cancel
+                  </Button>
+                  <Button 
+                    onClick={handleCreate} 
+                    disabled={createMutation.isPending || !formData.url.trim()}
+                  >
+                    {createMutation.isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+                    Add URL
+                  </Button>
+                </DialogFooter>
+              </DialogContent>
+            </Dialog>
+            <Button onClick={() => refetch()} variant="outline" size="sm">
+              <RefreshCw className="h-4 w-4 mr-2" />
+              Refresh
+            </Button>
+          </div>
+        </div>
+
+        {/* Stats */}
+        <div className="grid gap-4 grid-cols-2 md:grid-cols-3">
+          <Card className="border-l-4 border-l-primary">
+            <CardContent className="pt-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm text-muted-foreground">Total URLs</p>
+                  <p className="text-2xl font-bold">{urls?.length || 0}</p>
+                </div>
+                <Globe className="h-8 w-8 text-primary opacity-50" />
+              </div>
+            </CardContent>
+          </Card>
+          <Card className="border-l-4 border-l-emerald-500">
+            <CardContent className="pt-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm text-muted-foreground">Allowed</p>
+                  <p className="text-2xl font-bold text-emerald-600">{allowedCount}</p>
+                </div>
+                <Check className="h-8 w-8 text-emerald-500 opacity-50" />
+              </div>
+            </CardContent>
+          </Card>
+          <Card className="border-l-4 border-l-rose-500">
+            <CardContent className="pt-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm text-muted-foreground">Blocked</p>
+                  <p className="text-2xl font-bold text-rose-600">{blockedCount}</p>
+                </div>
+                <GlobeLock className="h-8 w-8 text-rose-500 opacity-50" />
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Filters */}
+        <Card>
+          <CardContent className="pt-6">
+            <div className="flex flex-col md:flex-row gap-4">
+              <div className="relative flex-1">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                <Input
+                  placeholder="Search URLs..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="pl-9"
+                />
+              </div>
+              <select
+                value={accessFilter}
+                onChange={(e) => setAccessFilter(e.target.value as any)}
+                className="px-3 py-2 border rounded-md text-sm bg-background min-w-[140px]"
+              >
+                <option value="all">All Access</option>
+                <option value="allowed">Allowed</option>
+                <option value="blocked">Blocked</option>
+              </select>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* URLs Table */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Globe className="h-5 w-5" />
+              Website Rules ({filteredUrls.length})
+            </CardTitle>
+            <CardDescription>
+              Configure which websites are allowed or blocked.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            {isLoading ? (
+              <div className="flex items-center justify-center py-12">
+                <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+              </div>
+            ) : filteredUrls.length === 0 ? (
+              <div className="text-center py-12 text-muted-foreground">
+                <Globe className="h-12 w-12 mx-auto mb-3 opacity-20" />
+                <p>No URLs found</p>
+                <p className="text-sm mt-1">Add your first URL to get started</p>
+              </div>
+            ) : (
+              <div className="rounded-md border">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>URL</TableHead>
+                      <TableHead>Access</TableHead>
+                      <TableHead>Created</TableHead>
+                      <TableHead className="text-right">Actions</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {filteredUrls.map((url) => (
+                      <TableRow key={url.id} className="hover:bg-muted/50">
+                        <TableCell>
+                          <div className="flex items-center gap-2">
+                            {url.access === 'allowed' ? (
+                              <Globe className="h-4 w-4 text-emerald-500" />
+                            ) : (
+                              <GlobeLock className="h-4 w-4 text-rose-500" />
+                            )}
+                            <span className="font-medium">{url.url}</span>
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          <Badge 
+                            variant={url.access === 'allowed' ? 'default' : 'destructive'}
+                            className={url.access === 'allowed' 
+                              ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900 dark:text-emerald-100 cursor-pointer hover:bg-emerald-200' 
+                              : 'cursor-pointer hover:bg-rose-700'
+                            }
+                            onClick={() => toggleAccessMutation.mutate({
+                              id: url.id,
+                              access: url.access === 'allowed' ? 'blocked' : 'allowed'
+                            })}
+                          >
+                            {url.access === 'allowed' ? (
+                              <><Check className="h-3 w-3 mr-1" /> Allowed</>
+                            ) : (
+                              <><X className="h-3 w-3 mr-1" /> Blocked</>
+                            )}
+                          </Badge>
+                        </TableCell>
+                        <TableCell>
+                          {url.createdAt ? (
+                            <span className="text-sm text-muted-foreground">
+                              {formatDistanceToNow(new Date(url.createdAt), { addSuffix: true })}
+                            </span>
+                          ) : '-'}
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <Button variant="ghost" size="sm">
+                                <MoreHorizontal className="h-4 w-4" />
+                              </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end">
+                              <DropdownMenuItem onClick={() => openEditDialog(url)}>
+                                <Edit className="h-4 w-4 mr-2" />
+                                Edit
+                              </DropdownMenuItem>
+                              <DropdownMenuItem 
+                                onClick={() => toggleAccessMutation.mutate({
+                                  id: url.id,
+                                  access: url.access === 'allowed' ? 'blocked' : 'allowed'
+                                })}
+                              >
+                                {url.access === 'allowed' ? (
+                                  <><X className="h-4 w-4 mr-2" />Block</>
+                                ) : (
+                                  <><Check className="h-4 w-4 mr-2" />Allow</>
+                                )}
+                              </DropdownMenuItem>
+                              <DropdownMenuItem 
+                                onClick={() => deleteMutation.mutate(url.id)}
+                                className="text-destructive"
+                              >
+                                <Trash2 className="h-4 w-4 mr-2" />
+                                Delete
+                              </DropdownMenuItem>
+                            </DropdownMenuContent>
+                          </DropdownMenu>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
+        {/* Edit Dialog */}
+        <Dialog open={!!editUrl} onOpenChange={(open) => !open && setEditUrl(null)}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Edit URL</DialogTitle>
+              <DialogDescription>
+                Update URL details.
+              </DialogDescription>
+            </DialogHeader>
+            <div className="space-y-4 py-4">
+              <div className="space-y-2">
+                <Label htmlFor="edit-url">Website URL</Label>
+                <Input
+                  id="edit-url"
+                  value={formData.url}
+                  onChange={(e) => setFormData(prev => ({ ...prev, url: e.target.value }))}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>Access</Label>
+                <div className="flex gap-2">
+                  <Button
+                    type="button"
+                    variant={formData.access === 'allowed' ? 'default' : 'outline'}
+                    onClick={() => setFormData(prev => ({ ...prev, access: 'allowed' }))}
+                    className={formData.access === 'allowed' ? 'bg-emerald-600 hover:bg-emerald-700' : ''}
+                  >
+                    <Check className="h-4 w-4 mr-1" />
+                    Allow
+                  </Button>
+                  <Button
+                    type="button"
+                    variant={formData.access === 'blocked' ? 'default' : 'outline'}
+                    onClick={() => setFormData(prev => ({ ...prev, access: 'blocked' }))}
+                    className={formData.access === 'blocked' ? 'bg-rose-600 hover:bg-rose-700' : ''}
+                  >
+                    <X className="h-4 w-4 mr-1" />
+                    Block
+                  </Button>
+                </div>
+              </div>
+            </div>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setEditUrl(null)}>
+                Cancel
+              </Button>
+              <Button 
+                onClick={handleUpdate} 
+                disabled={updateMutation.isPending || !formData.url.trim()}
+              >
+                {updateMutation.isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+                Save Changes
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      </div>
+    </Layout>
+  );
+}
