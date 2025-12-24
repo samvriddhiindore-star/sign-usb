@@ -312,23 +312,57 @@ export async function registerRoutes(
   app.get("/api/systems", authMiddleware, async (req, res) => {
     try {
       const systems = await storage.getSystems();
-      res.json(systems.map(s => ({
-        machineId: s.machineId,
-        pcName: s.pcName,
-        macId: s.macId,
-        usbStatus: s.usbStatus,
-        machineOn: s.machineOn,
-        lastConnected: s.lastConnected?.toISOString() || null,
-        remark: s.remark,
-        createdAt: s.createdAt?.toISOString() || null,
-        status: s.machineOn === 1 ? 'online' : 'offline',
-        profileId: s.profileId,
-        profile: s.profile ? {
-          profileId: s.profile.profileId,
-          profileName: s.profile.profileName,
-          usbPolicy: s.profile.usbPolicy
-        } : null
-      })));
+      
+      // Helper function to check if system is online (last_connected within 1 minute)
+      const isSystemOnline = (machineOn: number | null, lastConnected: Date | null): boolean => {
+        if (machineOn === 0) return false;
+        if (!lastConnected) return false;
+        
+        const now = new Date();
+        const lastConnectedTime = new Date(lastConnected);
+        const diffInMs = now.getTime() - lastConnectedTime.getTime();
+        const diffInMinutes = diffInMs / (1000 * 60);
+        
+        // If last connected is more than 1 minute ago, consider offline
+        return diffInMinutes <= 1;
+      };
+      
+      res.json(systems.map(s => {
+        const isOnline = isSystemOnline(s.machineOn, s.lastConnected);
+        
+        // Debug logging for offline systems
+        if (!isOnline && s.machineOn === 1) {
+          const now = new Date();
+          const lastConnectedTime = s.lastConnected ? new Date(s.lastConnected) : null;
+          const diffInMs = lastConnectedTime ? now.getTime() - lastConnectedTime.getTime() : null;
+          const diffInMinutes = diffInMs ? diffInMs / (1000 * 60) : null;
+          console.log(`[DEBUG] System ${s.machineId} (${s.pcName}) marked offline:`, {
+            machineOn: s.machineOn,
+            lastConnected: s.lastConnected?.toISOString(),
+            diffInMinutes: diffInMinutes?.toFixed(2),
+            status: 'offline'
+          });
+        }
+        
+        return {
+          machineId: s.machineId,
+          machineUid: s.machineUid || null,
+          pcName: s.pcName,
+          macId: s.macId,
+          usbStatus: s.usbStatus,
+          machineOn: s.machineOn,
+          lastConnected: s.lastConnected?.toISOString() || null,
+          remark: s.remark,
+          createdAt: s.createdAt?.toISOString() || null,
+          status: isOnline ? 'online' : 'offline',
+          profileId: s.profileId,
+          profile: s.profile ? {
+            profileId: s.profile.profileId,
+            profileName: s.profile.profileName,
+            usbPolicy: s.profile.usbPolicy
+          } : null
+        };
+      }));
     } catch (error: any) {
       res.status(500).json({ error: error.message });
     }
@@ -342,8 +376,25 @@ export async function registerRoutes(
       const system = await storage.getSystem(id);
       if (!system) return res.status(404).json({ error: "System not found" });
       
+      // Helper function to check if system is online (last_connected within 1 minute)
+      const isSystemOnline = (machineOn: number | null, lastConnected: Date | null): boolean => {
+        if (machineOn === 0) return false;
+        if (!lastConnected) return false;
+        
+        const now = new Date();
+        const lastConnectedTime = new Date(lastConnected);
+        const diffInMs = now.getTime() - lastConnectedTime.getTime();
+        const diffInMinutes = diffInMs / (1000 * 60);
+        
+        // If last connected is more than 1 minute ago, consider offline
+        return diffInMinutes <= 1;
+      };
+      
+      const isOnline = isSystemOnline(system.machineOn, system.lastConnected);
+      
       res.json({
         machineId: system.machineId,
+        machineUid: system.machineUid || null,
         pcName: system.pcName,
         macId: system.macId,
         usbStatus: system.usbStatus,
@@ -351,7 +402,7 @@ export async function registerRoutes(
         lastConnected: system.lastConnected?.toISOString() || null,
         remark: system.remark,
         createdAt: system.createdAt?.toISOString() || null,
-        status: system.machineOn === 1 ? 'online' : 'offline',
+        status: isOnline ? 'online' : 'offline',
         profileId: system.profileId,
         profile: system.profile ? {
           profileId: system.profile.profileId,
@@ -370,6 +421,7 @@ export async function registerRoutes(
       const systems = await storage.getDisconnectedSystems(days);
       res.json(systems.map(s => ({
         machineId: s.machineId,
+        machineUid: s.machineUid || null,
         pcName: s.pcName,
         macId: s.macId,
         lastConnected: s.lastConnected?.toISOString() || null,
@@ -490,6 +542,7 @@ export async function registerRoutes(
       
       res.json(logs.map(log => ({
         id: log.id,
+        logUid: log.logUid || null,
         machineId: log.machineId,
         pcName: log.pcName || 'Unknown',
         deviceName: log.deviceName,
@@ -520,6 +573,7 @@ export async function registerRoutes(
       
       res.json(logs.map(log => ({
         id: log.id,
+        logUid: log.logUid || null,
         machineId: log.machineId,
         deviceName: log.deviceName,
         deviceDescription: log.deviceDescription,
@@ -544,6 +598,7 @@ export async function registerRoutes(
       const devices = await storage.getConnectedUsbDevices();
       res.json(devices.map(d => ({
         id: d.id,
+        logUid: d.logUid || null,
         machineId: d.machineId,
         pcName: d.pcName || 'Unknown',
         deviceName: d.deviceName,
@@ -559,20 +614,41 @@ export async function registerRoutes(
   app.get("/api/profiles", authMiddleware, async (req, res) => {
     try {
       const profiles = await storage.getProfiles();
+      
+      // Helper function to check if system is online (last_connected within 1 minute)
+      const isSystemOnline = (machineOn: number | null, lastConnected: Date | null): boolean => {
+        if (machineOn === 0) return false;
+        if (!lastConnected) return false;
+        
+        const now = new Date();
+        const lastConnectedTime = new Date(lastConnected);
+        const diffInMs = now.getTime() - lastConnectedTime.getTime();
+        const diffInMinutes = diffInMs / (1000 * 60);
+        
+        // If last connected is more than 1 minute ago, consider offline
+        return diffInMinutes <= 1;
+      };
+      
       res.json(profiles.map(p => ({
         profileId: p.profileId,
+        profileUid: p.profileUid || null,
         profileName: p.profileName,
         description: p.description,
         isActive: p.isActive,
         usbPolicy: p.usbPolicy,
         assignedCount: p.assignedCount,
-        machines: p.machines.map(m => ({
-          machineId: m.machineId,
-          pcName: m.pcName,
-          macId: m.macId,
-          usbStatus: m.usbStatus,
-          machineOn: m.machineOn
-        })),
+        machines: p.machines.map(m => {
+          const isOnline = isSystemOnline(m.machineOn, m.lastConnected);
+          return {
+            machineId: m.machineId,
+            pcName: m.pcName,
+            macId: m.macId,
+            usbStatus: m.usbStatus,
+            machineOn: m.machineOn,
+            status: isOnline ? 'online' : 'offline',
+            lastConnected: m.lastConnected?.toISOString() || null
+          };
+        }),
         createdAt: p.createdAt?.toISOString() || null
       })));
     } catch (error: any) {
@@ -588,20 +664,40 @@ export async function registerRoutes(
       const profile = await storage.getProfile(id);
       if (!profile) return res.status(404).json({ error: "Profile not found" });
       
+      // Helper function to check if system is online (last_connected within 1 minute)
+      const isSystemOnline = (machineOn: number | null, lastConnected: Date | null): boolean => {
+        if (machineOn === 0) return false;
+        if (!lastConnected) return false;
+        
+        const now = new Date();
+        const lastConnectedTime = new Date(lastConnected);
+        const diffInMs = now.getTime() - lastConnectedTime.getTime();
+        const diffInMinutes = diffInMs / (1000 * 60);
+        
+        // If last connected is more than 1 minute ago, consider offline
+        return diffInMinutes <= 1;
+      };
+      
       res.json({
         profileId: profile.profileId,
+        profileUid: profile.profileUid || null,
         profileName: profile.profileName,
         description: profile.description,
         isActive: profile.isActive,
         usbPolicy: profile.usbPolicy,
         assignedCount: profile.assignedCount,
-        machines: profile.machines.map(m => ({
-          machineId: m.machineId,
-          pcName: m.pcName,
-          macId: m.macId,
-          usbStatus: m.usbStatus,
-          machineOn: m.machineOn
-        })),
+        machines: profile.machines.map(m => {
+          const isOnline = isSystemOnline(m.machineOn, m.lastConnected);
+          return {
+            machineId: m.machineId,
+            pcName: m.pcName,
+            macId: m.macId,
+            usbStatus: m.usbStatus,
+            machineOn: m.machineOn,
+            status: isOnline ? 'online' : 'offline',
+            lastConnected: m.lastConnected?.toISOString() || null
+          };
+        }),
         createdAt: profile.createdAt?.toISOString() || null
       });
     } catch (error: any) {
@@ -611,6 +707,16 @@ export async function registerRoutes(
 
   app.post("/api/profiles", authMiddleware, async (req, res) => {
     try {
+      console.log("POST /api/profiles - Request body:", JSON.stringify(req.body, null, 2));
+      
+      // Preprocess: convert empty strings to undefined, string numbers to numbers
+      const preprocessed = {
+        ...req.body,
+        description: req.body.description && req.body.description.trim() ? req.body.description.trim() : undefined,
+        usbPolicy: req.body.usbPolicy !== undefined ? (typeof req.body.usbPolicy === 'string' ? parseInt(req.body.usbPolicy, 10) : req.body.usbPolicy) : undefined,
+        isActive: req.body.isActive !== undefined ? (typeof req.body.isActive === 'string' ? parseInt(req.body.isActive, 10) : req.body.isActive) : undefined
+      };
+      
       const schema = z.object({
         profileName: z.string().min(1),
         description: z.string().optional(),
@@ -618,19 +724,80 @@ export async function registerRoutes(
         isActive: z.number().optional()
       });
       
-      const data = schema.parse(req.body);
-      const profile = await storage.createProfile(data);
+      const data = schema.parse(preprocessed);
+      console.log("POST /api/profiles - Parsed data:", JSON.stringify(data, null, 2));
       
-      res.status(201).json({
+      const profile = await storage.createProfile(data);
+      console.log("POST /api/profiles - Created profile:", profile.profileId);
+      
+      // Return in the same format as GET /api/profiles
+      try {
+        const profileWithMachines = await storage.getProfile(profile.profileId);
+        if (profileWithMachines) {
+          return res.status(201).json({
+            profileId: profileWithMachines.profileId,
+            profileUid: profileWithMachines.profileUid || null,
+            profileName: profileWithMachines.profileName,
+            description: profileWithMachines.description,
+            isActive: profileWithMachines.isActive,
+            usbPolicy: profileWithMachines.usbPolicy,
+            assignedCount: profileWithMachines.assignedCount,
+            machines: profileWithMachines.machines.map(m => {
+              // Helper function to check if system is online (last_connected within 1 minute)
+              const isSystemOnline = (machineOn: number | null, lastConnected: Date | null): boolean => {
+                if (machineOn === 0) return false;
+                if (!lastConnected) return false;
+                
+                const now = new Date();
+                const lastConnectedTime = new Date(lastConnected);
+                const diffInMs = now.getTime() - lastConnectedTime.getTime();
+                const diffInMinutes = diffInMs / (1000 * 60);
+                
+                // If last connected is more than 1 minute ago, consider offline
+                return diffInMinutes <= 1;
+              };
+              
+              const isOnline = isSystemOnline(m.machineOn, m.lastConnected);
+              return {
+                machineId: m.machineId,
+                pcName: m.pcName,
+                macId: m.macId,
+                usbStatus: m.usbStatus,
+                machineOn: m.machineOn,
+                status: isOnline ? 'online' : 'offline',
+                lastConnected: m.lastConnected?.toISOString() || null
+              };
+            }),
+            createdAt: profileWithMachines.createdAt?.toISOString() || null
+          });
+        }
+      } catch (getProfileError: any) {
+        console.error("Error fetching profile with machines, using fallback:", getProfileError);
+      }
+      
+      // Fallback to basic profile if getProfile fails
+      return res.status(201).json({
         profileId: profile.profileId,
+        profileUid: profile.profileUid || null,
         profileName: profile.profileName,
         description: profile.description,
         isActive: profile.isActive,
         usbPolicy: profile.usbPolicy,
+        assignedCount: 0,
+        machines: [],
         createdAt: profile.createdAt?.toISOString() || null
       });
     } catch (error: any) {
-      res.status(400).json({ error: error.message });
+      console.error("Error creating profile:", error);
+      console.error("Error stack:", error.stack);
+      // Check if it's a Zod validation error
+      if (error.name === 'ZodError' || error.issues) {
+        const zodError = error.issues || error.errors;
+        const errorMessage = zodError?.[0]?.message || error.message || 'Validation error';
+        console.error("Zod validation error:", JSON.stringify(zodError, null, 2));
+        return res.status(400).json({ error: errorMessage });
+      }
+      res.status(400).json({ error: error.message || 'Failed to create profile' });
     }
   });
 
@@ -708,6 +875,7 @@ export async function registerRoutes(
       const urls = await storage.getUrls();
       res.json(urls.map(u => ({
         id: u.id,
+        urlUid: u.urlUid || null,
         url: u.url,
         access: u.remark || 'allowed',
         createdAt: u.createdAt?.toISOString() || null
@@ -727,6 +895,7 @@ export async function registerRoutes(
       
       res.json({
         id: url.id,
+        urlUid: url.urlUid || null,
         url: url.url,
         access: url.remark || 'allowed',
         createdAt: url.createdAt?.toISOString() || null
@@ -809,6 +978,7 @@ export async function registerRoutes(
       const devices = await storage.getDevices();
       res.json(devices.map(d => ({
         id: d.id,
+        deviceUid: d.deviceUid || null,
         machineId: d.machineId,
         pcName: d.pcName || null,
         deviceName: d.deviceName,
@@ -835,6 +1005,7 @@ export async function registerRoutes(
       
       res.json({
         id: device.id,
+        deviceUid: device.deviceUid || null,
         machineId: device.machineId,
         deviceName: device.deviceName,
         description: device.description,
@@ -858,6 +1029,7 @@ export async function registerRoutes(
       const devices = await storage.getDevicesByMachine(machineId);
       res.json(devices.map(d => ({
         id: d.id,
+        deviceUid: d.deviceUid || null,
         machineId: d.machineId,
         deviceName: d.deviceName,
         description: d.description,
@@ -948,6 +1120,326 @@ export async function registerRoutes(
       if (!success) return res.status(404).json({ error: "Device not found" });
       
       res.json({ success: true, message: "Device deleted successfully" });
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // ==================== REPORTS ====================
+  
+  // Device-to-Machine mapping report
+  app.get("/api/reports/devices-by-machine", authMiddleware, async (req, res) => {
+    try {
+      console.log('[API] Fetching devices-by-machine report...');
+      const report = await storage.getDevicesByMachineReport();
+      console.log('[API] Devices-by-machine report fetched:', report.length, 'machines');
+      
+      // Helper function to check if system is online (last_connected within 1 minute)
+      const isSystemOnline = (machineOn: number | null, lastConnected: Date | null): boolean => {
+        if (machineOn === 0) return false;
+        if (!lastConnected) return false;
+        
+        const now = new Date();
+        const lastConnectedTime = new Date(lastConnected);
+        const diffInMs = now.getTime() - lastConnectedTime.getTime();
+        const diffInMinutes = diffInMs / (1000 * 60);
+        
+        // If last connected is more than 1 minute ago, consider offline
+        return diffInMinutes <= 1;
+      };
+      
+      // Add calculated status to each machine in the report and serialize dates
+      const reportWithStatus = report.map(machine => {
+        const isOnline = isSystemOnline(machine.machineOn, machine.lastConnected);
+        return {
+          machineId: machine.machineId,
+          pcName: machine.pcName,
+          macId: machine.macId,
+          machineOn: machine.machineOn,
+          lastConnected: machine.lastConnected?.toISOString() || null,
+          totalDevices: machine.totalDevices,
+          allowedDevices: machine.allowedDevices,
+          blockedDevices: machine.blockedDevices,
+          status: isOnline ? 'online' : 'offline',
+          devices: machine.devices.map(d => ({
+            id: d.id,
+            deviceUid: d.deviceUid || null,
+            machineId: d.machineId,
+            deviceName: d.deviceName,
+            description: d.description,
+            deviceId: d.deviceId,
+            deviceManufacturer: d.deviceManufacturer,
+            remark: d.remark,
+            isAllowed: d.isAllowed,
+            createdAt: d.createdAt?.toISOString() || null,
+            updatedAt: d.updatedAt?.toISOString() || null
+          }))
+        };
+      });
+      
+      res.json(reportWithStatus);
+    } catch (error: any) {
+      console.error('[API] Error fetching devices-by-machine report:', error);
+      console.error('[API] Error stack:', error.stack);
+      res.status(500).json({ error: error.message || 'Failed to fetch devices-by-machine report' });
+    }
+  });
+
+  // USB Activity report
+  app.get("/api/reports/usb-activity", authMiddleware, async (req, res) => {
+    try {
+      console.log('[API] Fetching USB activity report...');
+      const startDate = req.query.startDate ? new Date(req.query.startDate as string) : undefined;
+      const endDate = req.query.endDate ? new Date(req.query.endDate as string) : undefined;
+      
+      const report = await storage.getUsbActivityReport(startDate, endDate);
+      console.log('[API] USB activity report fetched:', {
+        totalEvents: report.totalEvents,
+        byMachine: report.byMachine.length,
+        byDevice: report.byDevice.length
+      });
+      
+      // Serialize dates in recentActivity
+      const serializedReport = {
+        ...report,
+        recentActivity: report.recentActivity.map(log => ({
+          ...log,
+          connectTime: log.connectTime?.toISOString() || null,
+          disconnectTime: log.disconnectTime?.toISOString() || null,
+          createdAt: log.createdAt?.toISOString() || null
+        }))
+      };
+      
+      res.json(serializedReport);
+    } catch (error: any) {
+      console.error('[API] Error fetching USB activity report:', error);
+      console.error('[API] Error stack:', error.stack);
+      res.status(500).json({ error: error.message || 'Failed to fetch USB activity report' });
+    }
+  });
+
+  // System Health report
+  app.get("/api/reports/system-health", authMiddleware, async (req, res) => {
+    try {
+      const report = await storage.getSystemHealthReport();
+      res.json(report);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // Device Analytics report
+  app.get("/api/reports/device-analytics", authMiddleware, async (req, res) => {
+    try {
+      console.log('[API] Fetching device analytics report...');
+      const report = await storage.getDeviceAnalyticsReport();
+      console.log('[API] Device analytics report fetched:', {
+        totalDevices: report.summary.totalDevices,
+        byManufacturer: report.byManufacturer.length,
+        byMachine: report.byMachine.length,
+        recentDevices: report.recentDevices.length,
+        offlineSystems: report.offlineSystems.length
+      });
+      
+      // Helper function to safely serialize a device
+      const serializeDevice = (d: any) => {
+        try {
+          return {
+            id: d.id,
+            deviceUid: d.deviceUid || null,
+            machineId: d.machineId,
+            pcName: d.pcName || null,
+            deviceName: d.deviceName || '',
+            description: d.description || null,
+            deviceId: d.deviceId || null,
+            deviceManufacturer: d.deviceManufacturer || null,
+            remark: d.remark || null,
+            isAllowed: d.isAllowed ?? 1,
+            createdAt: d.createdAt instanceof Date ? d.createdAt.toISOString() : (d.createdAt || null),
+            updatedAt: d.updatedAt instanceof Date ? d.updatedAt.toISOString() : (d.updatedAt || null)
+          };
+        } catch (err) {
+          console.error('[API] Error serializing device:', err, d);
+          return null;
+        }
+      };
+      
+      // Convert dates to ISO strings for JSON serialization
+      const serializedReport = {
+        summary: report.summary,
+        byManufacturer: report.byManufacturer,
+        byStatus: report.byStatus,
+        byMachine: report.byMachine.map(m => {
+          try {
+            return {
+              ...m,
+              lastDeviceAdded: m.lastDeviceAdded instanceof Date 
+                ? m.lastDeviceAdded.toISOString() 
+                : (m.lastDeviceAdded || null)
+            };
+          } catch (err) {
+            console.error('[API] Error serializing machine:', err, m);
+            return { ...m, lastDeviceAdded: null };
+          }
+        }),
+        recentDevices: report.recentDevices.map(serializeDevice).filter(d => d !== null),
+        topDevices: report.topDevices,
+        offlineSystems: report.offlineSystems.map(system => {
+          try {
+            return {
+              ...system,
+              lastConnected: system.lastConnected instanceof Date 
+                ? system.lastConnected.toISOString() 
+                : (system.lastConnected || null),
+              devices: system.devices.map(serializeDevice).filter(d => d !== null)
+            };
+          } catch (err) {
+            console.error('[API] Error serializing offline system:', err, system);
+            return {
+              ...system,
+              lastConnected: null,
+              devices: []
+            };
+          }
+        })
+      };
+      
+      res.json(serializedReport);
+    } catch (error: any) {
+      console.error('[API] Error fetching device analytics:', error);
+      console.error('[API] Error stack:', error.stack);
+      res.status(500).json({ 
+        error: error.message || 'Failed to fetch device analytics report',
+        details: process.env.NODE_ENV === 'development' ? error.stack : undefined
+      });
+    }
+  });
+
+  // Machine-wise device report
+  app.get("/api/reports/machine-devices/:machineId", authMiddleware, async (req, res) => {
+    try {
+      const machineId = parseInt(req.params.machineId);
+      if (isNaN(machineId)) return res.status(400).json({ error: "Invalid machine ID" });
+      
+      const report = await storage.getMachineDeviceReport(machineId);
+      // Convert dates to ISO strings
+      const serializedReport = {
+        machine: report.machine ? {
+          ...report.machine,
+          lastConnected: report.machine.lastConnected?.toISOString() || null,
+          createdAt: report.machine.createdAt?.toISOString() || null
+        } : null,
+        devices: report.devices.map(d => ({
+          ...d,
+          createdAt: d.createdAt?.toISOString() || null,
+          updatedAt: d.updatedAt?.toISOString() || null
+        })),
+        summary: report.summary
+      };
+      res.json(serializedReport);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // Export devices as CSV
+  app.get("/api/reports/export/devices", authMiddleware, async (req, res) => {
+    try {
+      const devices = await storage.getDevices();
+      
+      const csv = [
+        ['ID', 'Machine ID', 'PC Name', 'Device Name', 'Device ID', 'Manufacturer', 'Description', 'Status', 'Remark', 'Created At'].join(','),
+        ...devices.map(d => [
+          d.id,
+          d.machineId || '',
+          d.pcName || '',
+          `"${(d.deviceName || '').replace(/"/g, '""')}"`,
+          `"${(d.deviceId || '').replace(/"/g, '""')}"`,
+          `"${(d.deviceManufacturer || '').replace(/"/g, '""')}"`,
+          `"${(d.description || '').replace(/"/g, '""')}"`,
+          d.isAllowed === 1 ? 'Allowed' : 'Blocked',
+          `"${(d.remark || '').replace(/"/g, '""')}"`,
+          d.createdAt?.toISOString() || ''
+        ].join(','))
+      ].join('\n');
+
+      res.setHeader('Content-Type', 'text/csv');
+      res.setHeader('Content-Disposition', `attachment; filename=devices-report-${new Date().toISOString().split('T')[0]}.csv`);
+      res.send(csv);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // Export USB logs as CSV
+  app.get("/api/reports/export/usb-logs", authMiddleware, async (req, res) => {
+    try {
+      const limit = req.query.limit ? parseInt(req.query.limit as string) : 1000;
+      const logs = await storage.getUsbLogs(limit);
+      
+      const csv = [
+        ['ID', 'Machine ID', 'PC Name', 'Device Name', 'Device ID', 'Manufacturer', 'Port', 'Connect Time', 'Disconnect Time', 'Status'].join(','),
+        ...logs.map(l => [
+          l.id,
+          l.machineId,
+          `"${(l.pcName || '').replace(/"/g, '""')}"`,
+          `"${(l.deviceName || '').replace(/"/g, '""')}"`,
+          `"${(l.deviceId || '').replace(/"/g, '""')}"`,
+          `"${(l.deviceManufacturer || '').replace(/"/g, '""')}"`,
+          l.devicePort || '',
+          l.deviceConnectTime?.toISOString() || '',
+          l.deviceDisconnectTime?.toISOString() || '',
+          l.deviceDisconnectTime ? 'Removed' : 'Connected'
+        ].join(','))
+      ].join('\n');
+
+      res.setHeader('Content-Type', 'text/csv');
+      res.setHeader('Content-Disposition', `attachment; filename=usb-logs-report-${new Date().toISOString().split('T')[0]}.csv`);
+      res.send(csv);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // Export systems as CSV
+  app.get("/api/reports/export/systems", authMiddleware, async (req, res) => {
+    try {
+      const systems = await storage.getSystems();
+      
+      // Helper function to check if system is online (last_connected within 1 minute)
+      const isSystemOnline = (machineOn: number | null, lastConnected: Date | null): boolean => {
+        if (machineOn === 0) return false;
+        if (!lastConnected) return false;
+        
+        const now = new Date();
+        const lastConnectedTime = new Date(lastConnected);
+        const diffInMs = now.getTime() - lastConnectedTime.getTime();
+        const diffInMinutes = diffInMs / (1000 * 60);
+        
+        // If last connected is more than 1 minute ago, consider offline
+        return diffInMinutes <= 1;
+      };
+      
+      const csv = [
+        ['Machine ID', 'PC Name', 'MAC ID', 'USB Status', 'Online Status', 'Profile', 'Last Connected', 'Created At'].join(','),
+        ...systems.map(s => {
+          const isOnline = isSystemOnline(s.machineOn, s.lastConnected);
+          return [
+            s.machineId,
+            `"${(s.pcName || '').replace(/"/g, '""')}"`,
+            s.macId || '',
+            s.usbStatus === 1 ? 'Enabled' : 'Disabled',
+            isOnline ? 'Online' : 'Offline',
+            s.profile?.profileName || 'No Profile',
+            s.lastConnected?.toISOString() || '',
+            s.createdAt?.toISOString() || ''
+          ].join(',');
+        })
+      ].join('\n');
+
+      res.setHeader('Content-Type', 'text/csv');
+      res.setHeader('Content-Disposition', `attachment; filename=systems-report-${new Date().toISOString().split('T')[0]}.csv`);
+      res.send(csv);
     } catch (error: any) {
       res.status(500).json({ error: error.message });
     }

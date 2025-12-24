@@ -20,8 +20,8 @@ import {
   DropdownMenuTrigger
 } from "@/components/ui/dropdown-menu";
 import { 
-  Globe, GlobeLock, Plus, RefreshCw, MoreHorizontal, 
-  Edit, Trash2, Loader2, Search, Check, X, Shield
+  Globe, Plus, RefreshCw, MoreHorizontal, 
+  Edit, Trash2, Loader2, Search, Check
 } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 import { useToast } from "@/hooks/use-toast";
@@ -29,9 +29,8 @@ import { useToast } from "@/hooks/use-toast";
 export default function WebAccessControlPage() {
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [editUrl, setEditUrl] = useState<UrlEntry | null>(null);
-  const [formData, setFormData] = useState({ url: '', access: 'blocked' as 'allowed' | 'blocked' });
+  const [formData, setFormData] = useState({ url: '', access: 'allowed' as 'allowed' | 'blocked' });
   const [searchTerm, setSearchTerm] = useState("");
-  const [accessFilter, setAccessFilter] = useState<'all' | 'allowed' | 'blocked'>('all');
   
   const queryClient = useQueryClient();
   const { toast } = useToast();
@@ -47,7 +46,7 @@ export default function WebAccessControlPage() {
       queryClient.invalidateQueries({ queryKey: ['urls'] });
       queryClient.invalidateQueries({ queryKey: ['dashboard-stats'] });
       setIsCreateOpen(false);
-      setFormData({ url: '', access: 'blocked' });
+      setFormData({ url: '', access: 'allowed' });
       toast({ title: "URL added successfully" });
     },
     onError: () => {
@@ -81,24 +80,11 @@ export default function WebAccessControlPage() {
     }
   });
 
-  const toggleAccessMutation = useMutation({
-    mutationFn: ({ id, access }: { id: number; access: 'allowed' | 'blocked' }) =>
-      api.updateUrl(id, { access }),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['urls'] });
-      queryClient.invalidateQueries({ queryKey: ['dashboard-stats'] });
-      toast({ title: "Access updated" });
-    },
-    onError: () => {
-      toast({ title: "Failed to update access", variant: "destructive" });
-    }
-  });
-
-  // Filter URLs
+  // Filter URLs - only show allowed URLs
   const filteredUrls = urls?.filter(url => {
     const matchesSearch = url.url.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesAccess = accessFilter === 'all' || url.access === accessFilter;
-    return matchesSearch && matchesAccess;
+    // Only show allowed URLs
+    return matchesSearch && url.access === 'allowed';
   }) || [];
 
   const handleCreate = () => {
@@ -110,18 +96,17 @@ export default function WebAccessControlPage() {
     if (!editUrl || !formData.url.trim()) return;
     updateMutation.mutate({ 
       id: editUrl.id, 
-      data: { url: formData.url, access: formData.access }
+      data: { url: formData.url, access: 'allowed' }
     });
   };
 
   const openEditDialog = (url: UrlEntry) => {
-    setFormData({ url: url.url, access: url.access });
+    setFormData({ url: url.url, access: 'allowed' });
     setEditUrl(url);
   };
 
-  // Stats
+  // Stats - only count allowed URLs
   const allowedCount = urls?.filter(u => u.access === 'allowed').length || 0;
-  const blockedCount = urls?.filter(u => u.access === 'blocked').length || 0;
 
   return (
     <Layout>
@@ -130,12 +115,12 @@ export default function WebAccessControlPage() {
         <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
           <div>
             <h1 className="text-3xl font-bold tracking-tight">Website Access Control</h1>
-            <p className="text-muted-foreground mt-1">Manage allowed and blocked websites.</p>
+            <p className="text-muted-foreground mt-1">Manage allowed websites.</p>
           </div>
           <div className="flex gap-2">
             <Dialog open={isCreateOpen} onOpenChange={setIsCreateOpen}>
               <DialogTrigger asChild>
-                <Button onClick={() => setFormData({ url: '', access: 'blocked' })}>
+                <Button onClick={() => setFormData({ url: '', access: 'allowed' })}>
                   <Plus className="h-4 w-4 mr-2" />
                   Add URL
                 </Button>
@@ -144,7 +129,7 @@ export default function WebAccessControlPage() {
                 <DialogHeader>
                   <DialogTitle>Add Website</DialogTitle>
                   <DialogDescription>
-                    Add a new URL to allow or block.
+                    Add a new URL to allow.
                   </DialogDescription>
                 </DialogHeader>
                 <div className="space-y-4 py-4">
@@ -156,29 +141,6 @@ export default function WebAccessControlPage() {
                       onChange={(e) => setFormData(prev => ({ ...prev, url: e.target.value }))}
                       placeholder="e.g., example.com"
                     />
-                  </div>
-                  <div className="space-y-2">
-                    <Label>Access</Label>
-                    <div className="flex gap-2">
-                      <Button
-                        type="button"
-                        variant={formData.access === 'allowed' ? 'default' : 'outline'}
-                        onClick={() => setFormData(prev => ({ ...prev, access: 'allowed' }))}
-                        className={formData.access === 'allowed' ? 'bg-emerald-600 hover:bg-emerald-700' : ''}
-                      >
-                        <Check className="h-4 w-4 mr-1" />
-                        Allow
-                      </Button>
-                      <Button
-                        type="button"
-                        variant={formData.access === 'blocked' ? 'default' : 'outline'}
-                        onClick={() => setFormData(prev => ({ ...prev, access: 'blocked' }))}
-                        className={formData.access === 'blocked' ? 'bg-rose-600 hover:bg-rose-700' : ''}
-                      >
-                        <X className="h-4 w-4 mr-1" />
-                        Block
-                      </Button>
-                    </div>
                   </div>
                 </div>
                 <DialogFooter>
@@ -203,13 +165,13 @@ export default function WebAccessControlPage() {
         </div>
 
         {/* Stats */}
-        <div className="grid gap-4 grid-cols-2 md:grid-cols-3">
+        <div className="grid gap-4 grid-cols-1 md:grid-cols-2">
           <Card className="border-l-4 border-l-primary">
             <CardContent className="pt-4">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm text-muted-foreground">Total URLs</p>
-                  <p className="text-2xl font-bold">{urls?.length || 0}</p>
+                  <p className="text-sm text-muted-foreground">Total Allowed URLs</p>
+                  <p className="text-2xl font-bold">{allowedCount}</p>
                 </div>
                 <Globe className="h-8 w-8 text-primary opacity-50" />
               </div>
@@ -219,21 +181,10 @@ export default function WebAccessControlPage() {
             <CardContent className="pt-4">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm text-muted-foreground">Allowed</p>
+                  <p className="text-sm text-muted-foreground">Active Rules</p>
                   <p className="text-2xl font-bold text-emerald-600">{allowedCount}</p>
                 </div>
                 <Check className="h-8 w-8 text-emerald-500 opacity-50" />
-              </div>
-            </CardContent>
-          </Card>
-          <Card className="border-l-4 border-l-rose-500">
-            <CardContent className="pt-4">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm text-muted-foreground">Blocked</p>
-                  <p className="text-2xl font-bold text-rose-600">{blockedCount}</p>
-                </div>
-                <GlobeLock className="h-8 w-8 text-rose-500 opacity-50" />
               </div>
             </CardContent>
           </Card>
@@ -246,21 +197,12 @@ export default function WebAccessControlPage() {
               <div className="relative flex-1">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                 <Input
-                  placeholder="Search URLs..."
+                  placeholder="Search allowed URLs..."
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
                   className="pl-9"
                 />
               </div>
-              <select
-                value={accessFilter}
-                onChange={(e) => setAccessFilter(e.target.value as any)}
-                className="px-3 py-2 border rounded-md text-sm bg-background min-w-[140px]"
-              >
-                <option value="all">All Access</option>
-                <option value="allowed">Allowed</option>
-                <option value="blocked">Blocked</option>
-              </select>
             </div>
           </CardContent>
         </Card>
@@ -270,10 +212,10 @@ export default function WebAccessControlPage() {
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <Globe className="h-5 w-5" />
-              Website Rules ({filteredUrls.length})
+              Allowed Websites ({filteredUrls.length})
             </CardTitle>
             <CardDescription>
-              Configure which websites are allowed or blocked.
+              Manage allowed websites.
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -303,31 +245,16 @@ export default function WebAccessControlPage() {
                       <TableRow key={url.id} className="hover:bg-muted/50">
                         <TableCell>
                           <div className="flex items-center gap-2">
-                            {url.access === 'allowed' ? (
-                              <Globe className="h-4 w-4 text-emerald-500" />
-                            ) : (
-                              <GlobeLock className="h-4 w-4 text-rose-500" />
-                            )}
+                            <Globe className="h-4 w-4 text-emerald-500" />
                             <span className="font-medium">{url.url}</span>
                           </div>
                         </TableCell>
                         <TableCell>
                           <Badge 
-                            variant={url.access === 'allowed' ? 'default' : 'destructive'}
-                            className={url.access === 'allowed' 
-                              ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900 dark:text-emerald-100 cursor-pointer hover:bg-emerald-200' 
-                              : 'cursor-pointer hover:bg-rose-700'
-                            }
-                            onClick={() => toggleAccessMutation.mutate({
-                              id: url.id,
-                              access: url.access === 'allowed' ? 'blocked' : 'allowed'
-                            })}
+                            variant="default"
+                            className="bg-emerald-100 text-emerald-800 dark:bg-emerald-900 dark:text-emerald-100"
                           >
-                            {url.access === 'allowed' ? (
-                              <><Check className="h-3 w-3 mr-1" /> Allowed</>
-                            ) : (
-                              <><X className="h-3 w-3 mr-1" /> Blocked</>
-                            )}
+                            <Check className="h-3 w-3 mr-1" /> Allowed
                           </Badge>
                         </TableCell>
                         <TableCell>
@@ -348,18 +275,6 @@ export default function WebAccessControlPage() {
                               <DropdownMenuItem onClick={() => openEditDialog(url)}>
                                 <Edit className="h-4 w-4 mr-2" />
                                 Edit
-                              </DropdownMenuItem>
-                              <DropdownMenuItem 
-                                onClick={() => toggleAccessMutation.mutate({
-                                  id: url.id,
-                                  access: url.access === 'allowed' ? 'blocked' : 'allowed'
-                                })}
-                              >
-                                {url.access === 'allowed' ? (
-                                  <><X className="h-4 w-4 mr-2" />Block</>
-                                ) : (
-                                  <><Check className="h-4 w-4 mr-2" />Allow</>
-                                )}
                               </DropdownMenuItem>
                               <DropdownMenuItem 
                                 onClick={() => deleteMutation.mutate(url.id)}
@@ -397,29 +312,6 @@ export default function WebAccessControlPage() {
                   value={formData.url}
                   onChange={(e) => setFormData(prev => ({ ...prev, url: e.target.value }))}
                 />
-              </div>
-              <div className="space-y-2">
-                <Label>Access</Label>
-                <div className="flex gap-2">
-                  <Button
-                    type="button"
-                    variant={formData.access === 'allowed' ? 'default' : 'outline'}
-                    onClick={() => setFormData(prev => ({ ...prev, access: 'allowed' }))}
-                    className={formData.access === 'allowed' ? 'bg-emerald-600 hover:bg-emerald-700' : ''}
-                  >
-                    <Check className="h-4 w-4 mr-1" />
-                    Allow
-                  </Button>
-                  <Button
-                    type="button"
-                    variant={formData.access === 'blocked' ? 'default' : 'outline'}
-                    onClick={() => setFormData(prev => ({ ...prev, access: 'blocked' }))}
-                    className={formData.access === 'blocked' ? 'bg-rose-600 hover:bg-rose-700' : ''}
-                  >
-                    <X className="h-4 w-4 mr-1" />
-                    Block
-                  </Button>
-                </div>
               </div>
             </div>
             <DialogFooter>

@@ -8,7 +8,11 @@
     "build": "tsx backend/script/build.ts",
     "start": "NODE_ENV=production node dist/index.cjs",
     "check": "tsc",
-    "db:push": "drizzle-kit push"
+    "db:push": "drizzle-kit push",
+    "add:guid-columns": "tsx backend/script/add-guid-columns.ts",
+    "backfill:profile-uuid": "tsx backend/script/backfill-profile-uuid.ts",
+    "backfill:all-uuid": "tsx backend/script/backfill-all-uuid.ts",
+    "test:profile-creation": "tsx backend/script/test-profile-creation.ts"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.10.0",

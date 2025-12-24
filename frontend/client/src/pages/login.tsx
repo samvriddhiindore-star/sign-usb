@@ -57,7 +57,7 @@ export default function LoginPage() {
           <div className="h-16 w-16 bg-primary rounded-xl flex items-center justify-center shadow-lg mb-4">
              <img src={logo} alt="Logo" className="h-12 w-12 rounded-lg object-contain" />
           </div>
-          <h1 className="text-3xl font-bold tracking-tight text-foreground">USB Sentinel</h1>
+          <h1 className="text-3xl font-bold tracking-tight text-foreground">SIGN - USB</h1>
           <p className="text-muted-foreground">Enterprise Device Control System</p>
         </div>
 

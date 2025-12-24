@@ -61,10 +61,13 @@ export interface ProfileMachine {
   macId: string;
   usbStatus: number;
   machineOn: number;
+  status?: 'online' | 'offline';
+  lastConnected?: string | null;
 }
 
 export interface Profile {
   profileId: number;
+  profileUid: string | null;
   profileName: string;
   description: string | null;
   isActive: number | null;
@@ -115,6 +118,64 @@ export interface User {
   lastLogin: string | null;
   createdAt: string;
   updatedAt: string | null;
+}
+
+// Report Types
+export interface DevicesByMachineReport {
+  machineId: number;
+  pcName: string;
+  macId: string;
+  machineOn: number;
+  totalDevices: number;
+  allowedDevices: number;
+  blockedDevices: number;
+  devices: DeviceEntry[];
+}
+
+export interface UsbActivityReport {
+  totalEvents: number;
+  byMachine: { machineId: number; pcName: string; eventCount: number }[];
+  byDevice: { deviceName: string; eventCount: number }[];
+  byDate: { date: string; eventCount: number }[];
+  recentActivity: UsbLog[];
+}
+
+export interface SystemHealthReport {
+  totalSystems: number;
+  onlineSystems: number;
+  offlineSystems: number;
+  usbEnabledSystems: number;
+  usbDisabledSystems: number;
+  systemsByProfile: { profileId: number | null; profileName: string; count: number }[];
+  systemsWithDevices: { machineId: number; pcName: string; deviceCount: number }[];
+  inactiveSystems: System[];
+}
+
+export interface DeviceAnalyticsReport {
+  summary: {
+    totalDevices: number;
+    allowedDevices: number;
+    blockedDevices: number;
+    devicesWithMachines: number;
+    orphanedDevices: number;
+  };
+  byManufacturer: { manufacturer: string; count: number; allowed: number; blocked: number }[];
+  byStatus: { status: string; count: number }[];
+  byMachine: { machineId: number; pcName: string; macId: string; totalDevices: number; allowedDevices: number; blockedDevices: number; lastDeviceAdded: string | null; isOnline: boolean }[];
+  recentDevices: DeviceEntry[];
+  topDevices: { deviceName: string; count: number; machines: number }[];
+  offlineSystems: { machineId: number; pcName: string; macId: string; lastConnected: string | null; totalDevices: number; allowedDevices: number; blockedDevices: number; devices: DeviceEntry[] }[];
+}
+
+export interface MachineDeviceReport {
+  machine: System | null;
+  devices: DeviceEntry[];
+  summary: {
+    totalDevices: number;
+    allowedDevices: number;
+    blockedDevices: number;
+    byManufacturer: { manufacturer: string; count: number }[];
+  };
 }
 
 // Legacy types for backwards compatibility
@@ -315,7 +376,8 @@ export const api = {
     return response.json();
   },
 
-  async createProfile(data: { profileName: string; description?: string }): Promise<Profile> {
+  async createProfile(data: { profileName: string; description?: string; usbPolicy?: number }): Promise<Profile> {
+    console.log("API: Creating profile with data:", data);
     const response = await fetch(`${API_BASE}/profiles`, {
       method: 'POST',
       headers: getAuthHeaders(),
@@ -323,13 +385,23 @@ export const api = {
     });
     
     if (!response.ok) {
-      throw new Error('Failed to create profile');
+      const errorText = await response.text();
+      console.error("API: Profile creation failed:", response.status, errorText);
+      let error;
+      try {
+        error = JSON.parse(errorText);
+      } catch {
+        error = { error: errorText || 'Failed to create profile' };
+      }
+      throw new Error(error.error || `Failed to create profile (${response.status})`);
     }
     
-    return response.json();
+    const result = await response.json();
+    console.log("API: Profile created successfully:", result);
+    return result;
   },
 
-  async updateProfile(id: number, data: { profileName?: string; description?: string; isActive?: number }): Promise<Profile> {
+  async updateProfile(id: number, data: { profileName?: string; description?: string; isActive?: number; usbPolicy?: number }): Promise<Profile> {
     const response = await fetch(`${API_BASE}/profiles/${id}`, {
       method: 'PUT',
       headers: getAuthHeaders(),
@@ -337,7 +409,8 @@ export const api = {
     });
     
     if (!response.ok) {
-      throw new Error('Failed to update profile');
+      const error = await response.json().catch(() => ({ error: 'Failed to update profile' }));
+      throw new Error(error.error || 'Failed to update profile');
     }
     
     return response.json();
@@ -618,6 +691,114 @@ export const api = {
     }
     
     return response.json();
+  },
+
+  // ==================== REPORTS ====================
+  async getDevicesByMachineReport(): Promise<DevicesByMachineReport[]> {
+    const response = await fetch(`${API_BASE}/reports/devices-by-machine`, {
+      headers: getAuthHeaders()
+    });
+    
+    if (!response.ok) {
+      throw new Error('Failed to fetch devices by machine report');
+    }
+    
+    return response.json();
+  },
+
+  async getUsbActivityReport(startDate?: string, endDate?: string): Promise<UsbActivityReport> {
+    const params = new URLSearchParams();
+    if (startDate) params.append('startDate', startDate);
+    if (endDate) params.append('endDate', endDate);
+    
+    const response = await fetch(`${API_BASE}/reports/usb-activity?${params}`, {
+      headers: getAuthHeaders()
+    });
+    
+    if (!response.ok) {
+      throw new Error('Failed to fetch USB activity report');
+    }
+    
+    return response.json();
+  },
+
+  async getSystemHealthReport(): Promise<SystemHealthReport> {
+    const response = await fetch(`${API_BASE}/reports/system-health`, {
+      headers: getAuthHeaders()
+    });
+    
+    if (!response.ok) {
+      throw new Error('Failed to fetch system health report');
+    }
+    
+    return response.json();
+  },
+
+  async getDeviceAnalyticsReport(): Promise<DeviceAnalyticsReport> {
+    try {
+      const response = await fetch(`${API_BASE}/reports/device-analytics`, {
+      headers: getAuthHeaders()
+    });
+    
+    if (!response.ok) {
+        let errorMessage = `HTTP ${response.status}: ${response.statusText}`;
+        try {
+          const errorData = await response.json();
+          errorMessage = errorData.error || errorMessage;
+          if (errorData.details) {
+            console.error('[API] Device analytics error details:', errorData.details);
+          }
+        } catch {
+          const errorText = await response.text();
+          errorMessage = errorText || errorMessage;
+        }
+        console.error('[API] Device analytics error:', errorMessage);
+        throw new Error(`Failed to fetch device analytics report: ${errorMessage}`);
+      }
+      
+      const data = await response.json();
+      console.log('[API] Device analytics response:', {
+        totalDevices: data.summary?.totalDevices,
+        byManufacturer: data.byManufacturer?.length,
+        byMachine: data.byMachine?.length,
+        offlineSystems: data.offlineSystems?.length
+      });
+      
+      // Validate response structure
+      if (!data.summary) {
+        console.error('[API] Invalid device analytics response structure:', data);
+        throw new Error('Invalid response format from server');
+      }
+      
+      return data;
+    } catch (error: any) {
+      console.error('[API] Device analytics fetch failed:', error);
+      throw error;
+    }
+  },
+
+  async getMachineDeviceReport(machineId: number): Promise<MachineDeviceReport> {
+    const response = await fetch(`${API_BASE}/reports/machine-devices/${machineId}`, {
+      headers: getAuthHeaders()
+    });
+    
+    if (!response.ok) {
+      throw new Error('Failed to fetch machine device report');
+    }
+    
+    return response.json();
+  },
+
+  getExportDevicesUrl(): string {
+    return `${API_BASE}/reports/export/devices`;
+  },
+
+  getExportUsbLogsUrl(limit?: number): string {
+    return `${API_BASE}/reports/export/usb-logs${limit ? `?limit=${limit}` : ''}`;
+  },
+
+  getExportSystemsUrl(): string {
+    return `${API_BASE}/reports/export/systems`;
   },
 
   // ==================== LEGACY (for backwards compatibility) ====================

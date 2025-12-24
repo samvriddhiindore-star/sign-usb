@@ -12,7 +12,7 @@ import LogsPage from "@/pages/logs";
 import UsersPage from "@/pages/users";
 import ProfilesPage from "@/pages/profiles";
 import WebAccessControlPage from "@/pages/web-access-control";
-import UsbDeviceControlPage from "@/pages/usb-device-control";
+import ReportsPage from "@/pages/reports";
 import SettingsPage from "@/pages/settings";
 
 function Router() {
@@ -26,7 +26,7 @@ function Router() {
       <Route path="/profiles" component={ProfilesPage} />
       <Route path="/users" component={UsersPage} /> {/* legacy path */}
       <Route path="/web-access-control" component={WebAccessControlPage} />
-      <Route path="/usb-device-control" component={UsbDeviceControlPage} />
+      <Route path="/reports" component={ReportsPage} />
       <Route path="/logs" component={LogsPage} />
       <Route path="/settings" component={SettingsPage} />
       

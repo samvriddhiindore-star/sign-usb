@@ -1,4 +1,4 @@
-# USB Sentinel - Windows Service Integration Guide
+# SIGN - USB - Windows Service Integration Guide
 
 ## 🎉 Backend Complete!
 

@@ -2,7 +2,7 @@ import { Link, useLocation } from "wouter";
 import { 
   LayoutDashboard, Monitor, Usb, Users, Globe, 
   ScrollText, Settings as SettingsIcon, LogOut, Menu,
-  Shield, UserCog
+  Shield, UserCog, BarChart3
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useState } from "react";
@@ -15,11 +15,10 @@ export default function Layout({ children }: { children: React.ReactNode }) {
     { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
     { href: "/systems", label: "Systems", icon: Monitor },
     { href: "/logs", label: "USB Logs", icon: Usb },
-    { href: "/usb-device-control", label: "Device Registry", icon: Shield },
+    { href: "/reports", label: "Reports", icon: BarChart3 },
     { href: "/profiles", label: "Profiles", icon: Users },
     { href: "/web-access-control", label: "Website Control", icon: Globe },
     { href: "/users", label: "User Management", icon: UserCog },
-    // { href: "/settings", label: "Settings", icon: SettingsIcon },
   ];
 
   const handleLogout = () => {
@@ -39,7 +38,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
             <Shield className="h-5 w-5 text-primary" />
           </div>
           <div>
-            <span className="font-bold text-lg tracking-tight block">USB Sentinel</span>
+            <span className="font-bold text-lg tracking-tight block">SIGN - USB</span>
             <span className="text-[10px] text-muted-foreground uppercase tracking-wider">Admin Panel</span>
           </div>
         </div>
@@ -96,7 +95,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
           </button>
           <div className="flex items-center gap-2">
             <Shield className="h-5 w-5 text-primary" />
-            <span className="font-semibold">USB Sentinel</span>
+            <span className="font-semibold">SIGN - USB</span>
           </div>
           <div className="w-6" />
         </header>

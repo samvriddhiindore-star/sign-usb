@@ -64,28 +64,29 @@ export default function ProfilesPage() {
   const unassignedMachines = systems?.filter(s => !s.profileId) || [];
 
   const createMutation = useMutation({
-    mutationFn: api.createProfile,
+    mutationFn: (data: { profileName: string; description?: string; usbPolicy?: number }) => 
+      api.createProfile(data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['profiles'] });
       setIsCreateOpen(false);
       setFormData({ profileName: '', description: '', usbPolicy: 0 });
       toast({ title: "Profile created successfully" });
     },
-    onError: () => {
-      toast({ title: "Failed to create profile", variant: "destructive" });
+    onError: (error: Error) => {
+      toast({ title: error.message || "Failed to create profile", variant: "destructive" });
     }
   });
 
   const updateMutation = useMutation({
-    mutationFn: ({ id, data }: { id: number; data: Partial<Profile> }) =>
+    mutationFn: ({ id, data }: { id: number; data: { profileName?: string; description?: string; usbPolicy?: number } }) =>
       api.updateProfile(id, data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['profiles'] });
       setEditProfile(null);
       toast({ title: "Profile updated successfully" });
     },
-    onError: () => {
-      toast({ title: "Failed to update profile", variant: "destructive" });
+    onError: (error: Error) => {
+      toast({ title: error.message || "Failed to update profile", variant: "destructive" });
     }
   });
 
@@ -131,7 +132,15 @@ export default function ProfilesPage() {
 
   const handleCreate = () => {
     if (!formData.profileName.trim()) return;
-    createMutation.mutate(formData);
+    const payload: { profileName: string; description?: string; usbPolicy: number } = {
+      profileName: formData.profileName.trim(),
+      usbPolicy: formData.usbPolicy ?? 0
+    };
+    if (formData.description.trim()) {
+      payload.description = formData.description.trim();
+    }
+    console.log("Creating profile with payload:", payload);
+    createMutation.mutate(payload);
   };
 
   const handleUpdate = () => {
@@ -139,8 +148,8 @@ export default function ProfilesPage() {
     updateMutation.mutate({ 
       id: editProfile.profileId, 
       data: {
-        profileName: formData.profileName,
-        description: formData.description,
+        profileName: formData.profileName.trim(),
+        description: formData.description.trim() || undefined,
         usbPolicy: formData.usbPolicy
       }
     });
@@ -432,13 +441,13 @@ export default function ProfilesPage() {
                                     </TableCell>
                                     <TableCell>
                                       <Badge 
-                                        variant={machine.machineOn === 1 ? "default" : "secondary"}
-                                        className={machine.machineOn === 1 
+                                        variant={(machine.status || (machine.machineOn === 1 ? 'online' : 'offline')) === 'online' ? "default" : "secondary"}
+                                        className={(machine.status || (machine.machineOn === 1 ? 'online' : 'offline')) === 'online' 
                                           ? "bg-emerald-100 text-emerald-800 dark:bg-emerald-900 dark:text-emerald-100" 
                                           : ""
                                         }
                                       >
-                                        {machine.machineOn === 1 ? (
+                                        {(machine.status || (machine.machineOn === 1 ? 'online' : 'offline')) === 'online' ? (
                                           <><Wifi className="h-3 w-3 mr-1" /> Online</>
                                         ) : (
                                           <><WifiOff className="h-3 w-3 mr-1" /> Offline</>

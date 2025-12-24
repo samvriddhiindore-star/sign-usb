@@ -20,6 +20,7 @@ export const admins = mysqlTable("admins", {
 // Profile management table (define first for reference)
 export const profileMaster = mysqlTable("profile_master", {
   profileId: int("profile_id").autoincrement().primaryKey(),
+  profileUid: varchar("profile_uid", { length: 36 }), // UUID stored as char(36)
   profileName: varchar("profile_name", { length: 150 }).notNull(),
   description: varchar("description", { length: 255 }),
   isActive: tinyint("is_active").default(1),
@@ -31,6 +32,7 @@ export const profileMaster = mysqlTable("profile_master", {
 // Client machines table
 export const clientMaster = mysqlTable("client_master", {
   machineId: int("machine_id").autoincrement().primaryKey(),
+  machineUid: varchar("machine_uid", { length: 36 }), // UUID stored as char(36)
   pcName: varchar("pc_name", { length: 255 }).notNull(),
   macId: varchar("mac_id", { length: 255 }).notNull(),
   usbStatus: tinyint("usb_status").default(0), // 0 = disabled, 1 = enabled
@@ -44,6 +46,7 @@ export const clientMaster = mysqlTable("client_master", {
 // USB activity logs table
 export const clientUsbStatus = mysqlTable("client_usb_status", {
   id: int("id").autoincrement().primaryKey(),
+  logUid: varchar("log_uid", { length: 36 }), // UUID stored as char(36)
   machineId: int("machine_id").notNull().references(() => clientMaster.machineId, { onDelete: "cascade" }),
   deviceName: varchar("device_name", { length: 255 }).notNull(),
   deviceDescription: varchar("device_description", { length: 100 }),
@@ -59,6 +62,7 @@ export const clientUsbStatus = mysqlTable("client_usb_status", {
 // URL/Website access control table
 export const urlMaster = mysqlTable("url_master", {
   id: int("id").autoincrement().primaryKey(),
+  urlUid: varchar("url_uid", { length: 36 }), // UUID stored as char(36)
   url: varchar("url", { length: 500 }).notNull(),
   remark: varchar("remark", { length: 255 }), // 'allowed' or 'blocked'
   createdAt: timestamp("created_at", { mode: "date" }).default(sql`CURRENT_TIMESTAMP`),
@@ -67,9 +71,10 @@ export const urlMaster = mysqlTable("url_master", {
 // Device Master - System-wide USB device registry
 export const deviceMaster = mysqlTable("device_master", {
   id: int("id").autoincrement().primaryKey(),
+  deviceUid: varchar("device_uid", { length: 36 }), // UUID stored as char(36)
   machineId: int("machine_id").references(() => clientMaster.machineId, { onDelete: "set null" }),
   deviceName: varchar("device_name", { length: 255 }).notNull(),
-  description: varchar("description", { length: 255 }),
+  deviceDescription: varchar("device_description", { length: 255 }), // Note: column name is device_description in DB
   deviceId: varchar("device_id", { length: 255 }),
   deviceManufacturer: varchar("device_manufacturer", { length: 150 }),
   remark: varchar("remark", { length: 255 }),
@@ -88,26 +93,31 @@ export const insertAdminSchema = createInsertSchema(admins).omit({
 
 export const insertClientMasterSchema = createInsertSchema(clientMaster).omit({
   machineId: true,
+  machineUid: true, // Auto-generated, don't include in insert
   createdAt: true,
 });
 
 export const insertClientUsbStatusSchema = createInsertSchema(clientUsbStatus).omit({
   id: true,
+  logUid: true, // Auto-generated, don't include in insert
   createdAt: true,
 });
 
 export const insertProfileMasterSchema = createInsertSchema(profileMaster).omit({
-  profileId: true,
+  profileId: true, // Can be set manually or auto-incremented
+  profileUid: true, // Auto-generated, don't include in insert
   createdAt: true,
 });
 
 export const insertUrlMasterSchema = createInsertSchema(urlMaster).omit({
   id: true,
+  urlUid: true, // Auto-generated, don't include in insert
   createdAt: true,
 });
 
 export const insertDeviceMasterSchema = createInsertSchema(deviceMaster).omit({
   id: true,
+  deviceUid: true, // Auto-generated, don't include in insert
   createdAt: true,
   updatedAt: true,
 });
@@ -136,6 +146,12 @@ export type ClientWithProfile = ClientMaster & {
 export type ProfileWithMachines = ProfileMaster & {
   machines: ClientMaster[];
   assignedCount: number;
+};
+
+// DeviceMaster with description mapped from deviceDescription for API compatibility
+// The database has device_description, but we map it to description in API responses
+export type DeviceMasterWithDescription = Omit<DeviceMaster, 'deviceDescription'> & {
+  description: string | null;
 };
 
 export type DashboardStats = {

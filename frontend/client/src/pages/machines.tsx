@@ -48,7 +48,9 @@ export default function MachinesPage() {
   const { data: systems, isLoading, refetch } = useQuery({
     queryKey: ['systems'],
     queryFn: api.getSystems,
-    refetchInterval: 15000
+    refetchInterval: 15000,
+    staleTime: 0, // Always consider data stale to force refetch
+    cacheTime: 0 // Don't cache data
   });
 
   const { data: profiles } = useQuery({
@@ -119,8 +121,19 @@ export default function MachinesPage() {
     
     const matchesStatus = 
       statusFilter === 'all' || 
-      (statusFilter === 'online' && system.machineOn === 1) ||
-      (statusFilter === 'offline' && system.machineOn === 0);
+      (statusFilter === 'online' && system.status === 'online') ||
+      (statusFilter === 'offline' && system.status === 'offline');
+    
+    // Debug logging for offline systems
+    if (statusFilter === 'offline' && system.status === 'offline') {
+      console.log(`[FRONTEND DEBUG] Offline system found:`, {
+        machineId: system.machineId,
+        pcName: system.pcName,
+        status: system.status,
+        machineOn: system.machineOn,
+        lastConnected: system.lastConnected
+      });
+    }
     
     const matchesUsb = 
       usbFilter === 'all' ||
@@ -134,6 +147,13 @@ export default function MachinesPage() {
     
     return matchesSearch && matchesStatus && matchesUsb && matchesProfile;
   }) || [];
+  
+  // Debug: Log all systems with their status
+  if (systems && systems.length > 0) {
+    const offlineCount = systems.filter(s => s.status === 'offline').length;
+    const onlineCount = systems.filter(s => s.status === 'online').length;
+    console.log(`[FRONTEND] Systems status: Total: ${systems.length}, Online: ${onlineCount}, Offline: ${offlineCount}`);
+  }
 
   const toggleSelectAll = () => {
     if (selectedIds.length === filteredSystems.length) {
@@ -346,13 +366,13 @@ export default function MachinesPage() {
                         </TableCell>
                         <TableCell>
                           <Badge 
-                            variant={system.machineOn === 1 ? "default" : "secondary"}
-                            className={system.machineOn === 1 
+                            variant={system.status === 'online' ? "default" : "secondary"}
+                            className={system.status === 'online' 
                               ? "bg-emerald-100 text-emerald-800 dark:bg-emerald-900 dark:text-emerald-100" 
                               : ""
                             }
                           >
-                            {system.machineOn === 1 ? (
+                            {system.status === 'online' ? (
                               <><Wifi className="h-3 w-3 mr-1" /> Online</>
                             ) : (
                               <><WifiOff className="h-3 w-3 mr-1" /> Offline</>
