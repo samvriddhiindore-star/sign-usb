@@ -73,6 +73,7 @@ export const deviceMaster = mysqlTable("device_master", {
   id: int("id").autoincrement().primaryKey(),
   deviceUid: varchar("device_uid", { length: 36 }), // UUID stored as char(36)
   machineId: int("machine_id").references(() => clientMaster.machineId, { onDelete: "set null" }),
+  profileId: int("profile_id").references(() => profileMaster.profileId, { onDelete: "set null" }), // Device can be assigned to only one profile
   deviceName: varchar("device_name", { length: 255 }).notNull(),
   deviceDescription: varchar("device_description", { length: 255 }), // Note: column name is device_description in DB
   deviceId: varchar("device_id", { length: 255 }),

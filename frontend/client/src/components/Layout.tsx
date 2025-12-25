@@ -2,14 +2,22 @@ import { Link, useLocation } from "wouter";
 import { 
   LayoutDashboard, Monitor, Usb, Users, Globe, 
   ScrollText, Settings as SettingsIcon, LogOut, Menu,
-  Shield, UserCog, BarChart3
+  Shield, UserCog, BarChart3, HelpCircle, ChevronDown, ChevronRight
 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 
 export default function Layout({ children }: { children: React.ReactNode }) {
   const [location] = useLocation();
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const isHelpActive = location.startsWith('/help');
+  const [helpMenuOpen, setHelpMenuOpen] = useState(isHelpActive);
+
+  useEffect(() => {
+    if (isHelpActive) {
+      setHelpMenuOpen(true);
+    }
+  }, [isHelpActive]);
 
   const navItems = [
     { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
@@ -19,6 +27,21 @@ export default function Layout({ children }: { children: React.ReactNode }) {
     { href: "/profiles", label: "Profiles", icon: Users },
     { href: "/web-access-control", label: "Website Control", icon: Globe },
     { href: "/users", label: "User Management", icon: UserCog },
+  ];
+
+  const helpMenuItems = [
+    { href: "/help", label: "Help Home", icon: HelpCircle },
+    { href: "/help/getting-started", label: "Getting Started", icon: null },
+    { href: "/help/login", label: "Login & Authentication", icon: null },
+    { href: "/help/dashboard", label: "Dashboard", icon: null },
+    { href: "/help/machines", label: "Machine Management", icon: null },
+    { href: "/help/profiles", label: "Profile Management", icon: null },
+    { href: "/help/users", label: "User Management", icon: null },
+    { href: "/help/reports", label: "Reports & Analytics", icon: null },
+    { href: "/help/website-control", label: "Website Control", icon: null },
+    { href: "/help/logs", label: "USB Activity Logs", icon: null },
+    { href: "/help/settings", label: "Settings", icon: null },
+    { href: "/help/troubleshooting", label: "Troubleshooting", icon: null },
   ];
 
   const handleLogout = () => {
@@ -60,6 +83,52 @@ export default function Layout({ children }: { children: React.ReactNode }) {
               </Link>
             );
           })}
+
+          {/* Help Menu */}
+          <div className="mt-2">
+            <button
+              onClick={() => setHelpMenuOpen(!helpMenuOpen)}
+              className={cn(
+                "w-full flex items-center justify-between px-4 py-2.5 rounded-lg text-sm font-medium transition-all duration-150",
+                isHelpActive
+                  ? "bg-primary text-primary-foreground shadow-sm"
+                  : "text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
+              )}
+            >
+              <div className="flex items-center">
+                <HelpCircle className={cn("h-5 w-5 mr-3", isHelpActive && "animate-pulse")} />
+                Help
+              </div>
+              {helpMenuOpen ? (
+                <ChevronDown className="h-4 w-4" />
+              ) : (
+                <ChevronRight className="h-4 w-4" />
+              )}
+            </button>
+            
+            {helpMenuOpen && (
+              <div className="ml-4 mt-1 space-y-1 border-l-2 border-sidebar-border pl-2">
+                {helpMenuItems.map((item) => {
+                  const isActive = location === item.href;
+                  const IconComponent = item.icon;
+                  return (
+                    <Link key={item.href} href={item.href}>
+                      <div className={cn(
+                        "flex items-center px-3 py-2 rounded-md text-xs font-medium transition-all duration-150 cursor-pointer",
+                        isActive
+                          ? "bg-primary/20 text-primary-foreground"
+                          : "text-sidebar-foreground/60 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
+                      )}>
+                        {IconComponent && <IconComponent className="h-3 w-3 mr-2" />}
+                        {!IconComponent && <span className="w-3 h-3 mr-2" />}
+                        {item.label}
+                      </div>
+                    </Link>
+                  );
+                })}
+              </div>
+            )}
+          </div>
         </nav>
 
         {/* User section */}

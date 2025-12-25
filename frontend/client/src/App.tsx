@@ -14,6 +14,18 @@ import ProfilesPage from "@/pages/profiles";
 import WebAccessControlPage from "@/pages/web-access-control";
 import ReportsPage from "@/pages/reports";
 import SettingsPage from "@/pages/settings";
+import HelpIndex from "@/pages/help/index";
+import GettingStartedHelp from "@/pages/help/getting-started";
+import LoginHelp from "@/pages/help/login";
+import DashboardHelp from "@/pages/help/dashboard";
+import MachinesHelp from "@/pages/help/machines";
+import ProfilesHelp from "@/pages/help/profiles";
+import UsersHelp from "@/pages/help/users";
+import ReportsHelp from "@/pages/help/reports";
+import WebsiteControlHelp from "@/pages/help/website-control";
+import LogsHelp from "@/pages/help/logs";
+import SettingsHelp from "@/pages/help/settings";
+import TroubleshootingHelp from "@/pages/help/troubleshooting";
 
 function Router() {
   return (
@@ -29,6 +41,20 @@ function Router() {
       <Route path="/reports" component={ReportsPage} />
       <Route path="/logs" component={LogsPage} />
       <Route path="/settings" component={SettingsPage} />
+      
+      {/* Help Pages */}
+      <Route path="/help" component={HelpIndex} />
+      <Route path="/help/getting-started" component={GettingStartedHelp} />
+      <Route path="/help/login" component={LoginHelp} />
+      <Route path="/help/dashboard" component={DashboardHelp} />
+      <Route path="/help/machines" component={MachinesHelp} />
+      <Route path="/help/profiles" component={ProfilesHelp} />
+      <Route path="/help/users" component={UsersHelp} />
+      <Route path="/help/reports" component={ReportsHelp} />
+      <Route path="/help/website-control" component={WebsiteControlHelp} />
+      <Route path="/help/logs" component={LogsHelp} />
+      <Route path="/help/settings" component={SettingsHelp} />
+      <Route path="/help/troubleshooting" component={TroubleshootingHelp} />
       
       {/* Default Redirects */}
       <Route path="/">

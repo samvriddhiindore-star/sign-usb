@@ -24,7 +24,7 @@ import {
   type ProfileWithMachines,
   type DeviceMasterWithDescription
 } from "../shared/schema";
-import { eq, desc, and, sql, gte, isNull, count, inArray, max } from "drizzle-orm";
+import { eq, desc, and, sql, gte, isNull, count, inArray, max, ne } from "drizzle-orm";
 
 export interface IStorage {
   // Admins
@@ -327,15 +327,61 @@ class DatabaseStorage implements IStorage {
   }
 
   async assignProfileToSystem(machineId: number, profileId: number | null): Promise<ClientMaster | undefined> {
+    // Enforce one profile per machine: if assigning a profile, unassign it from any other machine first
+    if (profileId !== null) {
+      // Find any other machine that has this profile assigned
+      const existingMachines = await db.select()
+        .from(clientMaster)
+        .where(and(
+          eq(clientMaster.profileId, profileId),
+          ne(clientMaster.machineId, machineId)
+        ));
+      
+      // Unassign the profile from other machines
+      if (existingMachines.length > 0) {
+        await db.update(clientMaster)
+          .set({ profileId: null })
+          .where(and(
+            eq(clientMaster.profileId, profileId),
+            ne(clientMaster.machineId, machineId)
+          ));
+      }
+    }
+    
+    // Assign the profile to the requested machine
     await db.update(clientMaster)
       .set({ profileId })
       .where(eq(clientMaster.machineId, machineId));
+    
     const result = await db.select().from(clientMaster).where(eq(clientMaster.machineId, machineId)).limit(1);
     return result[0];
   }
 
   async bulkAssignProfile(machineIds: number[], profileId: number | null): Promise<number> {
     if (machineIds.length === 0) return 0;
+    
+    // Enforce one profile per machine: if assigning a profile, unassign it from any other machines first
+    if (profileId !== null) {
+      // Find any machines that have this profile assigned (excluding the ones we're assigning to)
+      const existingMachines = await db.select()
+        .from(clientMaster)
+        .where(and(
+          eq(clientMaster.profileId, profileId),
+          sql`${clientMaster.machineId} NOT IN (${sql.join(machineIds.map(id => sql`${id}`), sql`, `)})`
+        ));
+      
+      // Unassign the profile from other machines
+      if (existingMachines.length > 0) {
+        await db.update(clientMaster)
+          .set({ profileId: null })
+          .where(and(
+            eq(clientMaster.profileId, profileId),
+            sql`${clientMaster.machineId} NOT IN (${sql.join(machineIds.map(id => sql`${id}`), sql`, `)})`
+          ));
+      }
+    }
+    
+    // Assign the profile to the requested machines
     const result = await db.update(clientMaster)
       .set({ profileId })
       .where(inArray(clientMaster.machineId, machineIds));
@@ -574,6 +620,7 @@ class DatabaseStorage implements IStorage {
         id: deviceMaster.id,
         deviceUid: deviceMaster.deviceUid,
         machineId: deviceMaster.machineId,
+        profileId: deviceMaster.profileId,
         deviceName: deviceMaster.deviceName,
         deviceDescription: deviceMaster.deviceDescription,
         deviceId: deviceMaster.deviceId,
@@ -604,6 +651,7 @@ class DatabaseStorage implements IStorage {
         id: deviceMaster.id,
         deviceUid: deviceMaster.deviceUid,
         machineId: deviceMaster.machineId,
+        profileId: deviceMaster.profileId,
         deviceName: deviceMaster.deviceName,
         deviceDescription: deviceMaster.deviceDescription,
         deviceId: deviceMaster.deviceId,
@@ -633,6 +681,7 @@ class DatabaseStorage implements IStorage {
         id: deviceMaster.id,
         deviceUid: deviceMaster.deviceUid,
         machineId: deviceMaster.machineId,
+        profileId: deviceMaster.profileId,
         deviceName: deviceMaster.deviceName,
         deviceDescription: deviceMaster.deviceDescription,
         deviceId: deviceMaster.deviceId,
@@ -662,6 +711,7 @@ class DatabaseStorage implements IStorage {
         id: deviceMaster.id,
         deviceUid: deviceMaster.deviceUid,
         machineId: deviceMaster.machineId,
+        profileId: deviceMaster.profileId,
         deviceName: deviceMaster.deviceName,
         deviceDescription: deviceMaster.deviceDescription,
         deviceId: deviceMaster.deviceId,
@@ -698,6 +748,13 @@ class DatabaseStorage implements IStorage {
       delete deviceData.description;
     }
     
+    // Enforce one profile per device: if assigning a profile, unassign it from any other device first
+    if (deviceData.profileId !== null && deviceData.profileId !== undefined) {
+      await db.update(deviceMaster)
+        .set({ profileId: null })
+        .where(eq(deviceMaster.profileId, deviceData.profileId));
+    }
+    
     const result = await db.insert(deviceMaster).values(deviceData);
     const insertedId = (result as any).insertId as number | undefined;
     if (!insertedId) throw new Error("Failed to create device");
@@ -713,6 +770,17 @@ class DatabaseStorage implements IStorage {
       updateData.deviceDescription = updateData.description;
       delete updateData.description;
     }
+    
+    // Enforce one profile per device: if assigning a profile, unassign it from any other device first
+    if (updateData.profileId !== null && updateData.profileId !== undefined) {
+      await db.update(deviceMaster)
+        .set({ profileId: null })
+        .where(and(
+          eq(deviceMaster.profileId, updateData.profileId),
+          ne(deviceMaster.id, id)
+        ));
+    }
+    
     await db.update(deviceMaster).set(updateData).where(eq(deviceMaster.id, id));
     return this.getDevice(id);
   }

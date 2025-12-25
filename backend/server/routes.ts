@@ -980,6 +980,7 @@ export async function registerRoutes(
         id: d.id,
         deviceUid: d.deviceUid || null,
         machineId: d.machineId,
+        profileId: d.profileId || null,
         pcName: d.pcName || null,
         deviceName: d.deviceName,
         description: d.description,
@@ -1031,6 +1032,7 @@ export async function registerRoutes(
         id: d.id,
         deviceUid: d.deviceUid || null,
         machineId: d.machineId,
+        profileId: d.profileId || null,
         deviceName: d.deviceName,
         description: d.description,
         deviceId: d.deviceId,
@@ -1048,6 +1050,7 @@ export async function registerRoutes(
     try {
       const schema = z.object({
         machineId: z.number().nullable().optional(),
+        profileId: z.number().nullable().optional(), // Device can be assigned to only one profile
         deviceName: z.string().min(1),
         description: z.string().optional(),
         deviceId: z.string().optional(),
@@ -1062,6 +1065,7 @@ export async function registerRoutes(
       res.status(201).json({
         id: device.id,
         machineId: device.machineId,
+        profileId: device.profileId || null,
         deviceName: device.deviceName,
         description: device.description,
         deviceId: device.deviceId,
@@ -1082,6 +1086,7 @@ export async function registerRoutes(
       
       const schema = z.object({
         machineId: z.number().nullable().optional(),
+        profileId: z.number().nullable().optional(), // Device can be assigned to only one profile
         deviceName: z.string().min(1).optional(),
         description: z.string().optional(),
         deviceId: z.string().optional(),
@@ -1097,6 +1102,7 @@ export async function registerRoutes(
       res.json({
         id: device.id,
         machineId: device.machineId,
+        profileId: device.profileId || null,
         deviceName: device.deviceName,
         description: device.description,
         deviceId: device.deviceId,
