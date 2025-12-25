@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { api, Profile, System } from "@/lib/api";
+import { api, SystemUser, System } from "@/lib/api";
 import Layout from "@/components/Layout";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -35,24 +35,24 @@ import {
 import { formatDistanceToNow } from "date-fns";
 import { useToast } from "@/hooks/use-toast";
 
-export default function ProfilesPage() {
+export default function SystemUsersPage() {
   const [isCreateOpen, setIsCreateOpen] = useState(false);
-  const [editProfile, setEditProfile] = useState<Profile | null>(null);
+  const [editSystemUser, setEditSystemUser] = useState<SystemUser | null>(null);
   const [formData, setFormData] = useState({ 
-    profileName: '', 
+    systemUserName: '', 
     description: '',
     usbPolicy: 0
   });
   const [addMachineDialogOpen, setAddMachineDialogOpen] = useState(false);
-  const [selectedProfileForMachine, setSelectedProfileForMachine] = useState<Profile | null>(null);
+  const [selectedSystemUserForMachine, setSelectedSystemUserForMachine] = useState<SystemUser | null>(null);
   const [selectedMachineId, setSelectedMachineId] = useState<string>('');
   
   const queryClient = useQueryClient();
   const { toast } = useToast();
 
-  const { data: profiles, isLoading, refetch } = useQuery({
-    queryKey: ['profiles'],
-    queryFn: api.getProfiles
+  const { data: systemUsers, isLoading, refetch } = useQuery({
+    queryKey: ['system-users'],
+    queryFn: api.getSystemUsers
   });
 
   const { data: systems } = useQuery({
@@ -61,51 +61,51 @@ export default function ProfilesPage() {
   });
 
   // Get unassigned machines
-  const unassignedMachines = systems?.filter(s => !s.profileId) || [];
+  const unassignedMachines = systems?.filter(s => !s.systemUserId) || [];
 
   const createMutation = useMutation({
-    mutationFn: (data: { profileName: string; description?: string; usbPolicy?: number }) => 
-      api.createProfile(data),
+    mutationFn: (data: { systemUserName: string; description?: string; usbPolicy?: number }) => 
+      api.createSystemUser(data),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['profiles'] });
+      queryClient.invalidateQueries({ queryKey: ['system-users'] });
       setIsCreateOpen(false);
-      setFormData({ profileName: '', description: '', usbPolicy: 0 });
-      toast({ title: "Profile created successfully" });
+      setFormData({ systemUserName: '', description: '', usbPolicy: 0 });
+      toast({ title: "System user created successfully" });
     },
     onError: (error: Error) => {
-      toast({ title: error.message || "Failed to create profile", variant: "destructive" });
+      toast({ title: error.message || "Failed to create system user", variant: "destructive" });
     }
   });
 
   const updateMutation = useMutation({
-    mutationFn: ({ id, data }: { id: number; data: { profileName?: string; description?: string; usbPolicy?: number } }) =>
-      api.updateProfile(id, data),
+    mutationFn: ({ id, data }: { id: number; data: { systemUserName?: string; description?: string; usbPolicy?: number } }) =>
+      api.updateSystemUser(id, data),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['profiles'] });
-      setEditProfile(null);
-      toast({ title: "Profile updated successfully" });
+      queryClient.invalidateQueries({ queryKey: ['system-users'] });
+      setEditSystemUser(null);
+      toast({ title: "System user updated successfully" });
     },
     onError: (error: Error) => {
-      toast({ title: error.message || "Failed to update profile", variant: "destructive" });
+      toast({ title: error.message || "Failed to update system user", variant: "destructive" });
     }
   });
 
   const deleteMutation = useMutation({
-    mutationFn: api.deleteProfile,
+    mutationFn: api.deleteSystemUser,
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['profiles'] });
+      queryClient.invalidateQueries({ queryKey: ['system-users'] });
       queryClient.invalidateQueries({ queryKey: ['systems'] });
-      toast({ title: "Profile deleted successfully" });
+      toast({ title: "System user deleted successfully" });
     },
     onError: () => {
-      toast({ title: "Failed to delete profile", variant: "destructive" });
+      toast({ title: "Failed to delete system user", variant: "destructive" });
     }
   });
 
   const applyPolicyMutation = useMutation({
-    mutationFn: api.applyProfilePolicy,
+    mutationFn: api.applySystemUserPolicy,
     onSuccess: (data) => {
-      queryClient.invalidateQueries({ queryKey: ['profiles'] });
+      queryClient.invalidateQueries({ queryKey: ['system-users'] });
       queryClient.invalidateQueries({ queryKey: ['systems'] });
       queryClient.invalidateQueries({ queryKey: ['dashboard-stats'] });
       toast({ title: `USB policy applied to ${data.affected} machines` });
@@ -116,10 +116,10 @@ export default function ProfilesPage() {
   });
 
   const assignMachineMutation = useMutation({
-    mutationFn: ({ machineId, profileId }: { machineId: number; profileId: number | null }) =>
-      api.assignProfileToSystem(machineId, profileId),
+    mutationFn: ({ machineId, systemUserId }: { machineId: number; systemUserId: number | null }) =>
+      api.assignSystemUserToSystem(machineId, systemUserId),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['profiles'] });
+      queryClient.invalidateQueries({ queryKey: ['system-users'] });
       queryClient.invalidateQueries({ queryKey: ['systems'] });
       setAddMachineDialogOpen(false);
       setSelectedMachineId('');
@@ -131,59 +131,59 @@ export default function ProfilesPage() {
   });
 
   const handleCreate = () => {
-    if (!formData.profileName.trim()) return;
-    const payload: { profileName: string; description?: string; usbPolicy: number } = {
-      profileName: formData.profileName.trim(),
+    if (!formData.systemUserName.trim()) return;
+    const payload: { systemUserName: string; description?: string; usbPolicy: number } = {
+      systemUserName: formData.systemUserName.trim(),
       usbPolicy: formData.usbPolicy ?? 0
     };
     if (formData.description.trim()) {
       payload.description = formData.description.trim();
     }
-    console.log("Creating profile with payload:", payload);
+    console.log("Creating system user with payload:", payload);
     createMutation.mutate(payload);
   };
 
   const handleUpdate = () => {
-    if (!editProfile || !formData.profileName.trim()) return;
+    if (!editSystemUser || !formData.systemUserName.trim()) return;
     updateMutation.mutate({ 
-      id: editProfile.profileId, 
+      id: editSystemUser.systemUserId, 
       data: {
-        profileName: formData.profileName.trim(),
+        systemUserName: formData.systemUserName.trim(),
         description: formData.description.trim() || undefined,
         usbPolicy: formData.usbPolicy
       }
     });
   };
 
-  const openEditDialog = (profile: Profile) => {
+  const openEditDialog = (systemUser: SystemUser) => {
     setFormData({ 
-      profileName: profile.profileName, 
-      description: profile.description || '',
-      usbPolicy: profile.usbPolicy || 0
+      systemUserName: systemUser.systemUserName, 
+      description: systemUser.description || '',
+      usbPolicy: systemUser.usbPolicy || 0
     });
-    setEditProfile(profile);
+    setEditSystemUser(systemUser);
   };
 
-  const openAddMachineDialog = (profile: Profile) => {
-    setSelectedProfileForMachine(profile);
+  const openAddMachineDialog = (systemUser: SystemUser) => {
+    setSelectedSystemUserForMachine(systemUser);
     setSelectedMachineId('');
     setAddMachineDialogOpen(true);
   };
 
   const handleAddMachine = () => {
-    if (!selectedProfileForMachine || !selectedMachineId) return;
+    if (!selectedSystemUserForMachine || !selectedMachineId) return;
     assignMachineMutation.mutate({
       machineId: parseInt(selectedMachineId),
-      profileId: selectedProfileForMachine.profileId
+      systemUserId: selectedSystemUserForMachine.systemUserId
     });
   };
 
   const handleRemoveMachine = (machineId: number) => {
-    assignMachineMutation.mutate({ machineId, profileId: null });
+    assignMachineMutation.mutate({ machineId, systemUserId: null });
   };
 
   // Stats
-  const totalAssigned = profiles?.reduce((sum, p) => sum + p.assignedCount, 0) || 0;
+  const totalAssigned = systemUsers?.reduce((sum, su) => sum + su.assignedCount, 0) || 0;
 
   return (
     <Layout>
@@ -191,31 +191,31 @@ export default function ProfilesPage() {
         {/* Header */}
         <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
           <div>
-            <h1 className="text-3xl font-bold tracking-tight">Profiles</h1>
-            <p className="text-muted-foreground mt-1">Create and manage system profiles with USB policies.</p>
+            <h1 className="text-3xl font-bold tracking-tight">System Users</h1>
+            <p className="text-muted-foreground mt-1">Create and manage system users with USB policies.</p>
           </div>
           <div className="flex gap-2">
             <Dialog open={isCreateOpen} onOpenChange={setIsCreateOpen}>
               <DialogTrigger asChild>
-                <Button onClick={() => setFormData({ profileName: '', description: '', usbPolicy: 0 })}>
+                <Button onClick={() => setFormData({ systemUserName: '', description: '', usbPolicy: 0 })}>
                   <Plus className="h-4 w-4 mr-2" />
-                  New Profile
+                  New SystemUser
                 </Button>
               </DialogTrigger>
               <DialogContent>
                 <DialogHeader>
-                  <DialogTitle>Create Profile</DialogTitle>
+                  <DialogTitle>Create System User</DialogTitle>
                   <DialogDescription>
-                    Create a new profile to group systems with similar USB policies.
+                    Create a new system user to group systems with similar USB policies.
                   </DialogDescription>
                 </DialogHeader>
                 <div className="space-y-4 py-4">
                   <div className="space-y-2">
-                    <Label htmlFor="name">Profile Name</Label>
+                    <Label htmlFor="name">SystemUser Name</Label>
                     <Input
                       id="name"
-                      value={formData.profileName}
-                      onChange={(e) => setFormData(prev => ({ ...prev, profileName: e.target.value }))}
+                      value={formData.systemUserName}
+                      onChange={(e) => setFormData(prev => ({ ...prev, systemUserName: e.target.value }))}
                       placeholder="e.g., Finance Department"
                     />
                   </div>
@@ -225,7 +225,7 @@ export default function ProfilesPage() {
                       id="description"
                       value={formData.description}
                       onChange={(e) => setFormData(prev => ({ ...prev, description: e.target.value }))}
-                      placeholder="Brief description of this profile..."
+                      placeholder="Brief description of this systemUser..."
                       rows={3}
                     />
                   </div>
@@ -233,7 +233,7 @@ export default function ProfilesPage() {
                     <div className="space-y-0.5">
                       <Label>USB Policy</Label>
                       <p className="text-sm text-muted-foreground">
-                        {formData.usbPolicy === 1 ? 'USB ports enabled for this profile' : 'USB ports disabled for this profile'}
+                        {formData.usbPolicy === 1 ? 'USB ports enabled for this systemUser' : 'USB ports disabled for this systemUser'}
                       </p>
                 </div>
                     <Switch
@@ -248,10 +248,10 @@ export default function ProfilesPage() {
                   </Button>
                   <Button 
                     onClick={handleCreate} 
-                    disabled={createMutation.isPending || !formData.profileName.trim()}
+                    disabled={createMutation.isPending || !formData.systemUserName.trim()}
                   >
                     {createMutation.isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
-                    Create Profile
+                    Create SystemUser
                   </Button>
                 </DialogFooter>
               </DialogContent>
@@ -269,8 +269,8 @@ export default function ProfilesPage() {
             <CardContent className="pt-4">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm text-muted-foreground">Total Profiles</p>
-                  <p className="text-2xl font-bold">{profiles?.length || 0}</p>
+                  <p className="text-sm text-muted-foreground">Total SystemUsers</p>
+                  <p className="text-2xl font-bold">{systemUsers?.length || 0}</p>
                 </div>
                 <Users className="h-8 w-8 text-primary opacity-50" />
                   </div>
@@ -280,9 +280,9 @@ export default function ProfilesPage() {
             <CardContent className="pt-4">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm text-muted-foreground">Active Profiles</p>
+                  <p className="text-sm text-muted-foreground">Active SystemUsers</p>
                   <p className="text-2xl font-bold text-emerald-600">
-                    {profiles?.filter(p => p.isActive === 1).length || 0}
+                    {systemUsers?.filter(p => p.isActive === 1).length || 0}
                   </p>
                 </div>
                 <Shield className="h-8 w-8 text-emerald-500 opacity-50" />
@@ -313,15 +313,15 @@ export default function ProfilesPage() {
           </Card>
         </div>
 
-        {/* Profiles List */}
+        {/* SystemUsers List */}
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <Users className="h-5 w-5" />
-              All Profiles
+              All SystemUsers
             </CardTitle>
             <CardDescription>
-              Click on a profile to expand and see assigned machines.
+              Click on a systemUser to expand and see assigned machines.
             </CardDescription>
               </CardHeader>
           <CardContent>
@@ -329,18 +329,18 @@ export default function ProfilesPage() {
               <div className="flex items-center justify-center py-12">
                 <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
               </div>
-            ) : !profiles || profiles.length === 0 ? (
+            ) : !systemUsers || systemUsers.length === 0 ? (
               <div className="text-center py-12 text-muted-foreground">
                 <Users className="h-12 w-12 mx-auto mb-3 opacity-20" />
-                <p>No profiles found</p>
-                <p className="text-sm mt-1">Create your first profile to get started</p>
+                <p>No systemUsers found</p>
+                <p className="text-sm mt-1">Create your first systemUser to get started</p>
               </div>
             ) : (
               <Accordion type="single" collapsible className="space-y-2">
-                {profiles.map((profile) => (
+                {systemUsers.map((systemUser) => (
                   <AccordionItem 
-                    key={profile.profileId} 
-                    value={profile.profileId.toString()}
+                    key={systemUser.systemUserId} 
+                    value={systemUser.systemUserId.toString()}
                     className="border rounded-lg px-4"
                   >
                     <AccordionTrigger className="hover:no-underline py-4">
@@ -350,15 +350,15 @@ export default function ProfilesPage() {
                             <Users className="h-5 w-5 text-primary" />
                           </div>
                           <div className="text-left">
-                            <p className="font-medium">{profile.profileName}</p>
+                            <p className="font-medium">{systemUser.systemUserName}</p>
                             <p className="text-sm text-muted-foreground">
-                              {profile.description || 'No description'}
+                              {systemUser.description || 'No description'}
                             </p>
                           </div>
                   </div>
                         <div className="flex items-center gap-3">
-                          <Badge variant={profile.usbPolicy === 1 ? "outline" : "destructive"} className="gap-1">
-                            {profile.usbPolicy === 1 ? (
+                          <Badge variant={systemUser.usbPolicy === 1 ? "outline" : "destructive"} className="gap-1">
+                            {systemUser.usbPolicy === 1 ? (
                               <><Unlock className="h-3 w-3" /> USB Enabled</>
                             ) : (
                               <><Lock className="h-3 w-3" /> USB Disabled</>
@@ -366,19 +366,19 @@ export default function ProfilesPage() {
                           </Badge>
                           <Badge variant="secondary">
                             <Monitor className="h-3 w-3 mr-1" />
-                            {profile.assignedCount} machines
+                            {systemUser.assignedCount} machines
                           </Badge>
                 </div>
                   </div>
                     </AccordionTrigger>
                     <AccordionContent className="pb-4">
                       <div className="pt-2 space-y-4">
-                        {/* Profile Actions */}
+                        {/* SystemUser Actions */}
                         <div className="flex gap-2 flex-wrap">
                           <Button 
                             size="sm" 
                             variant="outline"
-                            onClick={() => openAddMachineDialog(profile)}
+                            onClick={() => openAddMachineDialog(systemUser)}
                             disabled={unassignedMachines.length === 0}
                           >
                             <Plus className="h-4 w-4 mr-1" />
@@ -387,8 +387,8 @@ export default function ProfilesPage() {
                           <Button 
                             size="sm" 
                             variant="outline"
-                            onClick={() => applyPolicyMutation.mutate(profile.profileId)}
-                            disabled={applyPolicyMutation.isPending || profile.assignedCount === 0}
+                            onClick={() => applyPolicyMutation.mutate(systemUser.systemUserId)}
+                            disabled={applyPolicyMutation.isPending || systemUser.assignedCount === 0}
                           >
                             <Play className="h-4 w-4 mr-1" />
                             Apply USB Policy
@@ -396,7 +396,7 @@ export default function ProfilesPage() {
                           <Button 
                             size="sm" 
                             variant="outline"
-                            onClick={() => openEditDialog(profile)}
+                            onClick={() => openEditDialog(systemUser)}
                           >
                             <Edit className="h-4 w-4 mr-1" />
                             Edit
@@ -405,7 +405,7 @@ export default function ProfilesPage() {
                             size="sm" 
                             variant="outline"
                             className="text-destructive hover:text-destructive"
-                            onClick={() => deleteMutation.mutate(profile.profileId)}
+                            onClick={() => deleteMutation.mutate(systemUser.systemUserId)}
                           >
                             <Trash2 className="h-4 w-4 mr-1" />
                             Delete
@@ -413,7 +413,7 @@ export default function ProfilesPage() {
                 </div>
 
                         {/* Assigned Machines */}
-                        {profile.machines.length > 0 ? (
+                        {systemUser.machines.length > 0 ? (
                           <div className="rounded-md border">
                   <Table>
                     <TableHeader>
@@ -426,7 +426,7 @@ export default function ProfilesPage() {
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                                {profile.machines.map((machine) => (
+                                {systemUser.machines.map((machine) => (
                                   <TableRow key={machine.machineId}>
                                     <TableCell>
                                       <div className="flex items-center gap-2">
@@ -483,7 +483,7 @@ export default function ProfilesPage() {
                         ) : (
                           <div className="text-center py-8 text-muted-foreground border rounded-md">
                             <Monitor className="h-8 w-8 mx-auto mb-2 opacity-20" />
-                            <p className="text-sm">No machines assigned to this profile</p>
+                            <p className="text-sm">No machines assigned to this systemUser</p>
                           </div>
                         )}
                       </div>
@@ -496,21 +496,21 @@ export default function ProfilesPage() {
             </Card>
 
         {/* Edit Dialog */}
-        <Dialog open={!!editProfile} onOpenChange={(open) => !open && setEditProfile(null)}>
+        <Dialog open={!!editSystemUser} onOpenChange={(open) => !open && setEditSystemUser(null)}>
           <DialogContent>
             <DialogHeader>
-              <DialogTitle>Edit Profile</DialogTitle>
+              <DialogTitle>Edit SystemUser</DialogTitle>
               <DialogDescription>
-                Update profile details and USB policy.
+                Update systemUser details and USB policy.
               </DialogDescription>
             </DialogHeader>
             <div className="space-y-4 py-4">
               <div className="space-y-2">
-                <Label htmlFor="edit-name">Profile Name</Label>
+                <Label htmlFor="edit-name">SystemUser Name</Label>
                 <Input
                   id="edit-name"
-                  value={formData.profileName}
-                  onChange={(e) => setFormData(prev => ({ ...prev, profileName: e.target.value }))}
+                  value={formData.systemUserName}
+                  onChange={(e) => setFormData(prev => ({ ...prev, systemUserName: e.target.value }))}
                 />
               </div>
               <div className="space-y-2">
@@ -526,7 +526,7 @@ export default function ProfilesPage() {
                 <div className="space-y-0.5">
                   <Label>USB Policy</Label>
                   <p className="text-sm text-muted-foreground">
-                    {formData.usbPolicy === 1 ? 'USB ports enabled for this profile' : 'USB ports disabled for this profile'}
+                    {formData.usbPolicy === 1 ? 'USB ports enabled for this systemUser' : 'USB ports disabled for this systemUser'}
                   </p>
                 </div>
                 <Switch
@@ -536,12 +536,12 @@ export default function ProfilesPage() {
               </div>
             </div>
             <DialogFooter>
-              <Button variant="outline" onClick={() => setEditProfile(null)}>
+              <Button variant="outline" onClick={() => setEditSystemUser(null)}>
                 Cancel
               </Button>
               <Button 
                 onClick={handleUpdate} 
-                disabled={updateMutation.isPending || !formData.profileName.trim()}
+                disabled={updateMutation.isPending || !formData.systemUserName.trim()}
               >
                 {updateMutation.isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
                 Save Changes
@@ -554,9 +554,9 @@ export default function ProfilesPage() {
         <Dialog open={addMachineDialogOpen} onOpenChange={setAddMachineDialogOpen}>
           <DialogContent>
             <DialogHeader>
-              <DialogTitle>Add Machine to Profile</DialogTitle>
+              <DialogTitle>Add Machine to SystemUser</DialogTitle>
               <DialogDescription>
-                Assign a machine to "{selectedProfileForMachine?.profileName}"
+                Assign a machine to "{selectedSystemUserForMachine?.systemUserName}"
               </DialogDescription>
             </DialogHeader>
             <div className="py-4">

@@ -6,7 +6,7 @@
 3. [Dashboard Overview](#dashboard-overview)
 4. [Machine Management](#machine-management)
 5. [Profile Management](#profile-management)
-6. [User Management](#user-management)
+6. [Portal Users](#portal-users)
 7. [Reports & Analytics](#reports--analytics)
 8. [Website Access Control](#website-access-control)
 9. [USB Activity Logs](#usb-activity-logs)
@@ -280,10 +280,10 @@ The profiles list shows:
 
 ---
 
-## User Management
+## Portal Users
 
 ### Accessing Users Page
-1. Click on **"User Management"** in the sidebar navigation
+1. Click on **"Portal Users"** in the sidebar navigation
 2. The users page displays all admin users
 
 **Page URL**: `/users`

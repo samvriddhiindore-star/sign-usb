@@ -10,7 +10,7 @@ import MachineDetailPage from "@/pages/machine-detail";
 import DashboardPage from "@/pages/dashboard";
 import LogsPage from "@/pages/logs";
 import UsersPage from "@/pages/users";
-import ProfilesPage from "@/pages/profiles";
+import SystemUsersPage from "@/pages/system-users";
 import WebAccessControlPage from "@/pages/web-access-control";
 import ReportsPage from "@/pages/reports";
 import SettingsPage from "@/pages/settings";
@@ -19,7 +19,7 @@ import GettingStartedHelp from "@/pages/help/getting-started";
 import LoginHelp from "@/pages/help/login";
 import DashboardHelp from "@/pages/help/dashboard";
 import MachinesHelp from "@/pages/help/machines";
-import ProfilesHelp from "@/pages/help/profiles";
+import SystemUsersHelp from "@/pages/help/system-users";
 import UsersHelp from "@/pages/help/users";
 import ReportsHelp from "@/pages/help/reports";
 import WebsiteControlHelp from "@/pages/help/website-control";
@@ -35,7 +35,7 @@ function Router() {
       <Route path="/systems" component={MachinesPage} />
       <Route path="/machines" component={MachinesPage} /> {/* legacy path */}
       <Route path="/machines/:id" component={MachineDetailPage} />
-      <Route path="/profiles" component={ProfilesPage} />
+      <Route path="/system-users" component={SystemUsersPage} />
       <Route path="/users" component={UsersPage} /> {/* legacy path */}
       <Route path="/web-access-control" component={WebAccessControlPage} />
       <Route path="/reports" component={ReportsPage} />
@@ -48,7 +48,7 @@ function Router() {
       <Route path="/help/login" component={LoginHelp} />
       <Route path="/help/dashboard" component={DashboardHelp} />
       <Route path="/help/machines" component={MachinesHelp} />
-      <Route path="/help/profiles" component={ProfilesHelp} />
+      <Route path="/help/system-users" component={SystemUsersHelp} />
       <Route path="/help/users" component={UsersHelp} />
       <Route path="/help/reports" component={ReportsHelp} />
       <Route path="/help/website-control" component={WebsiteControlHelp} />

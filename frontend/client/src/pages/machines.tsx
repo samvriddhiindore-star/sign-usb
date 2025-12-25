@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { api, System, Profile } from "@/lib/api";
+import { api, System, SystemUser } from "@/lib/api";
 import Layout from "@/components/Layout";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -38,9 +38,9 @@ export default function MachinesPage() {
   const [selectedIds, setSelectedIds] = useState<number[]>([]);
   const [statusFilter, setStatusFilter] = useState<'all' | 'online' | 'offline'>('all');
   const [usbFilter, setUsbFilter] = useState<'all' | 'enabled' | 'disabled'>('all');
-  const [profileFilter, setProfileFilter] = useState<string>('all');
+  const [systemUserFilter, setSystemUserFilter] = useState<string>('all');
   const [assignDialogOpen, setAssignDialogOpen] = useState(false);
-  const [selectedProfileId, setSelectedProfileId] = useState<string>('');
+  const [selectedSystemUserId, setSelectedSystemUserId] = useState<string>('');
   
   const queryClient = useQueryClient();
   const { toast } = useToast();
@@ -53,9 +53,9 @@ export default function MachinesPage() {
     cacheTime: 0 // Don't cache data
   });
 
-  const { data: profiles } = useQuery({
-    queryKey: ['profiles'],
-    queryFn: api.getProfiles
+  const { data: systemUsers } = useQuery({
+    queryKey: ['systemUsers'],
+    queryFn: api.getSystemUsers
   });
 
   const updateUsbMutation = useMutation({
@@ -85,31 +85,31 @@ export default function MachinesPage() {
     }
   });
 
-  const assignProfileMutation = useMutation({
-    mutationFn: ({ machineId, profileId }: { machineId: number; profileId: number | null }) =>
-      api.assignProfileToSystem(machineId, profileId),
+  const assignSystemUserMutation = useMutation({
+    mutationFn: ({ machineId, systemUserId }: { machineId: number; systemUserId: number | null }) =>
+      api.assignSystemUserToSystem(machineId, systemUserId),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['systems'] });
-      queryClient.invalidateQueries({ queryKey: ['profiles'] });
-      toast({ title: "Profile assigned successfully" });
+      queryClient.invalidateQueries({ queryKey: ['systemUsers'] });
+      toast({ title: "SystemUser assigned successfully" });
     },
     onError: () => {
-      toast({ title: "Failed to assign profile", variant: "destructive" });
+      toast({ title: "Failed to assign systemUser", variant: "destructive" });
     }
   });
 
-  const bulkAssignProfileMutation = useMutation({
-    mutationFn: ({ machineIds, profileId }: { machineIds: number[]; profileId: number | null }) =>
-      api.bulkAssignProfile(machineIds, profileId),
+  const bulkAssignSystemUserMutation = useMutation({
+    mutationFn: ({ machineIds, systemUserId }: { machineIds: number[]; systemUserId: number | null }) =>
+      api.bulkAssignSystemUser(machineIds, systemUserId),
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ['systems'] });
-      queryClient.invalidateQueries({ queryKey: ['profiles'] });
+      queryClient.invalidateQueries({ queryKey: ['systemUsers'] });
       setSelectedIds([]);
       setAssignDialogOpen(false);
-      toast({ title: `Profile assigned to ${data.affected} systems` });
+      toast({ title: `SystemUser assigned to ${data.affected} systems` });
     },
     onError: () => {
-      toast({ title: "Failed to assign profile", variant: "destructive" });
+      toast({ title: "Failed to assign systemUser", variant: "destructive" });
     }
   });
 
@@ -140,12 +140,12 @@ export default function MachinesPage() {
       (usbFilter === 'enabled' && system.usbStatus === 1) ||
       (usbFilter === 'disabled' && system.usbStatus === 0);
     
-    const matchesProfile =
-      profileFilter === 'all' ||
-      (profileFilter === 'none' && !system.profileId) ||
-      (system.profileId?.toString() === profileFilter);
+    const matchesSystemUser =
+      systemUserFilter === 'all' ||
+      (systemUserFilter === 'none' && !system.systemUserId) ||
+      (system.systemUserId?.toString() === systemUserFilter);
     
-    return matchesSearch && matchesStatus && matchesUsb && matchesProfile;
+    return matchesSearch && matchesStatus && matchesUsb && matchesSystemUser;
   }) || [];
   
   // Debug: Log all systems with their status
@@ -179,10 +179,10 @@ export default function MachinesPage() {
     bulkUpdateMutation.mutate({ machineIds: selectedIds, enabled: false });
   };
 
-  const handleBulkAssignProfile = () => {
+  const handleBulkAssignSystemUser = () => {
     if (selectedIds.length === 0) return;
-    const profileId = selectedProfileId === 'none' ? null : parseInt(selectedProfileId);
-    bulkAssignProfileMutation.mutate({ machineIds: selectedIds, profileId });
+    const systemUserId = selectedSystemUserId === 'none' ? null : parseInt(selectedSystemUserId);
+    bulkAssignSystemUserMutation.mutate({ machineIds: selectedIds, systemUserId });
   };
 
   return (
@@ -233,14 +233,14 @@ export default function MachinesPage() {
                   <option value="disabled">USB Disabled</option>
                 </select>
                 <select
-                  value={profileFilter}
-                  onChange={(e) => setProfileFilter(e.target.value)}
+                  value={systemUserFilter}
+                  onChange={(e) => setSystemUserFilter(e.target.value)}
                   className="px-3 py-2 border rounded-md text-sm bg-background min-w-[140px]"
                 >
-                  <option value="all">All Profiles</option>
-                  <option value="none">No Profile</option>
-                  {profiles?.map(p => (
-                    <option key={p.profileId} value={p.profileId.toString()}>{p.profileName}</option>
+                  <option value="all">All SystemUsers</option>
+                  <option value="none">No SystemUser</option>
+                  {systemUsers?.map(p => (
+                    <option key={p.systemUserId} value={p.systemUserId.toString()}>{p.systemUserName}</option>
                   ))}
                 </select>
               </div>
@@ -281,7 +281,7 @@ export default function MachinesPage() {
                     onClick={() => setAssignDialogOpen(true)}
                   >
                     <UserPlus className="h-4 w-4 mr-1" />
-                    Assign Profile
+                    Assign SystemUser
                   </Button>
                   <Button 
                     size="sm" 
@@ -327,7 +327,7 @@ export default function MachinesPage() {
                       </TableHead>
                       <TableHead>PC Name</TableHead>
                       <TableHead>MAC ID</TableHead>
-                      <TableHead>Profile</TableHead>
+                      <TableHead>SystemUser</TableHead>
                       <TableHead>Status</TableHead>
                       <TableHead>USB</TableHead>
                       <TableHead>Last Connected</TableHead>
@@ -355,10 +355,10 @@ export default function MachinesPage() {
                           </code>
                         </TableCell>
                         <TableCell>
-                          {system.profile ? (
+                          {system.systemUser ? (
                             <Badge variant="outline" className="gap-1">
                               <Users className="h-3 w-3" />
-                              {system.profile.profileName}
+                              {system.systemUser.systemUserName}
                             </Badge>
                           ) : (
                             <span className="text-sm text-muted-foreground">—</span>
@@ -442,27 +442,27 @@ export default function MachinesPage() {
                               <DropdownMenuSub>
                                 <DropdownMenuSubTrigger>
                                   <Users className="h-4 w-4 mr-2" />
-                                  Assign Profile
+                                  Assign SystemUser
                                 </DropdownMenuSubTrigger>
                                 <DropdownMenuPortal>
                                   <DropdownMenuSubContent>
                                     <DropdownMenuItem
-                                      onClick={() => assignProfileMutation.mutate({
+                                      onClick={() => assignSystemUserMutation.mutate({
                                         machineId: system.machineId,
-                                        profileId: null
+                                        systemUserId: null
                                       })}
                                     >
-                                      <span className="text-muted-foreground">No Profile</span>
+                                      <span className="text-muted-foreground">No SystemUser</span>
                                     </DropdownMenuItem>
-                                    {profiles?.map(profile => (
+                                    {systemUsers?.map(systemUser => (
                                       <DropdownMenuItem
-                                        key={profile.profileId}
-                                        onClick={() => assignProfileMutation.mutate({
+                                        key={systemUser.systemUserId}
+                                        onClick={() => assignSystemUserMutation.mutate({
                                           machineId: system.machineId,
-                                          profileId: profile.profileId
+                                          systemUserId: systemUser.systemUserId
                                         })}
                                       >
-                                        {profile.profileName}
+                                        {systemUser.systemUserName}
                                       </DropdownMenuItem>
                                     ))}
                                   </DropdownMenuSubContent>
@@ -480,26 +480,26 @@ export default function MachinesPage() {
           </CardContent>
         </Card>
 
-        {/* Bulk Assign Profile Dialog */}
+        {/* Bulk Assign SystemUser Dialog */}
         <Dialog open={assignDialogOpen} onOpenChange={setAssignDialogOpen}>
           <DialogContent>
             <DialogHeader>
-              <DialogTitle>Assign Profile</DialogTitle>
+              <DialogTitle>Assign SystemUser</DialogTitle>
               <DialogDescription>
-                Assign a profile to {selectedIds.length} selected system{selectedIds.length > 1 ? 's' : ''}.
+                Assign a systemUser to {selectedIds.length} selected system{selectedIds.length > 1 ? 's' : ''}.
               </DialogDescription>
             </DialogHeader>
             <div className="py-4">
-              <Label htmlFor="profile-select">Select Profile</Label>
-              <Select value={selectedProfileId} onValueChange={setSelectedProfileId}>
+              <Label htmlFor="systemUser-select">Select SystemUser</Label>
+              <Select value={selectedSystemUserId} onValueChange={setSelectedSystemUserId}>
                 <SelectTrigger className="mt-2">
-                  <SelectValue placeholder="Choose a profile..." />
+                  <SelectValue placeholder="Choose a systemUser..." />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="none">No Profile (Remove)</SelectItem>
-                  {profiles?.map(profile => (
-                    <SelectItem key={profile.profileId} value={profile.profileId.toString()}>
-                      {profile.profileName}
+                  <SelectItem value="none">No SystemUser (Remove)</SelectItem>
+                  {systemUsers?.map(systemUser => (
+                    <SelectItem key={systemUser.systemUserId} value={systemUser.systemUserId.toString()}>
+                      {systemUser.systemUserName}
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -510,11 +510,11 @@ export default function MachinesPage() {
                 Cancel
               </Button>
               <Button 
-                onClick={handleBulkAssignProfile}
-                disabled={bulkAssignProfileMutation.isPending || !selectedProfileId}
+                onClick={handleBulkAssignSystemUser}
+                disabled={bulkAssignSystemUserMutation.isPending || !selectedSystemUserId}
               >
-                {bulkAssignProfileMutation.isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
-                Assign Profile
+                {bulkAssignSystemUserMutation.isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+                Assign SystemUser
               </Button>
             </DialogFooter>
           </DialogContent>

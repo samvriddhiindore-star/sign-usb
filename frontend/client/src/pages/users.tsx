@@ -271,8 +271,8 @@ export default function UsersPage() {
       <div className="space-y-8">
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-3xl font-bold tracking-tight">User Management</h1>
-            <p className="text-muted-foreground mt-1">Create and manage administrator and user accounts.</p>
+            <h1 className="text-3xl font-bold tracking-tight">Portal Users</h1>
+            <p className="text-muted-foreground mt-1">Create and manage portal user accounts.</p>
           </div>
           <Dialog open={isCreateOpen} onOpenChange={setIsCreateOpen}>
             <DialogTrigger asChild>

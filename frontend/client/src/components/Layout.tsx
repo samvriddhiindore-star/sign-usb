@@ -24,9 +24,9 @@ export default function Layout({ children }: { children: React.ReactNode }) {
     { href: "/systems", label: "Systems", icon: Monitor },
     { href: "/logs", label: "USB Logs", icon: Usb },
     { href: "/reports", label: "Reports", icon: BarChart3 },
-    { href: "/profiles", label: "Profiles", icon: Users },
+    { href: "/system-users", label: "System Users", icon: Users },
     { href: "/web-access-control", label: "Website Control", icon: Globe },
-    { href: "/users", label: "User Management", icon: UserCog },
+    { href: "/users", label: "Portal Users", icon: UserCog },
   ];
 
   const helpMenuItems = [
@@ -35,8 +35,8 @@ export default function Layout({ children }: { children: React.ReactNode }) {
     { href: "/help/login", label: "Login & Authentication", icon: null },
     { href: "/help/dashboard", label: "Dashboard", icon: null },
     { href: "/help/machines", label: "Machine Management", icon: null },
-    { href: "/help/profiles", label: "Profile Management", icon: null },
-    { href: "/help/users", label: "User Management", icon: null },
+    { href: "/help/system-users", label: "System User Management", icon: null },
+    { href: "/help/users", label: "Portal Users", icon: null },
     { href: "/help/reports", label: "Reports & Analytics", icon: null },
     { href: "/help/website-control", label: "Website Control", icon: null },
     { href: "/help/logs", label: "USB Activity Logs", icon: null },

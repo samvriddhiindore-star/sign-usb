@@ -31,10 +31,10 @@ export interface System {
   remark: string | null;
   createdAt: string | null;
   status: 'online' | 'offline';
-  profileId: number | null;
-  profile: {
-    profileId: number;
-    profileName: string;
+  systemUserId: number | null;
+  systemUser: {
+    systemUserId: number;
+    systemUserName: string;
     usbPolicy: number;
   } | null;
 }
@@ -55,7 +55,7 @@ export interface UsbLog {
   createdAt: string | null;
 }
 
-export interface ProfileMachine {
+export interface SystemUserMachine {
   machineId: number;
   pcName: string;
   macId: string;
@@ -65,15 +65,15 @@ export interface ProfileMachine {
   lastConnected?: string | null;
 }
 
-export interface Profile {
-  profileId: number;
-  profileUid: string | null;
-  profileName: string;
+export interface SystemUser {
+  systemUserId: number;
+  systemUserUid: string | null;
+  systemUserName: string;
   description: string | null;
   isActive: number | null;
   usbPolicy: number | null;
   assignedCount: number;
-  machines: ProfileMachine[];
+  machines: SystemUserMachine[];
   createdAt: string | null;
 }
 
@@ -87,7 +87,7 @@ export interface UrlEntry {
 export interface DeviceEntry {
   id: number;
   machineId: number | null;
-  profileId: number | null;
+  systemUserId: number | null;
   pcName: string | null;
   deviceName: string;
   description: string | null;
@@ -147,7 +147,7 @@ export interface SystemHealthReport {
   offlineSystems: number;
   usbEnabledSystems: number;
   usbDisabledSystems: number;
-  systemsByProfile: { profileId: number | null; profileName: string; count: number }[];
+  systemsBySystemUser: { systemUserId: number | null; systemUserName: string; count: number }[];
   systemsWithDevices: { machineId: number; pcName: string; deviceCount: number }[];
   inactiveSystems: System[];
 }
@@ -287,29 +287,29 @@ export const api = {
     return response.json();
   },
 
-  async assignProfileToSystem(machineId: number, profileId: number | null): Promise<{ success: boolean }> {
-    const response = await fetch(`${API_BASE}/systems/${machineId}/profile`, {
+  async assignSystemUserToSystem(machineId: number, systemUserId: number | null): Promise<{ success: boolean }> {
+    const response = await fetch(`${API_BASE}/systems/${machineId}/system-user`, {
       method: 'PUT',
       headers: getAuthHeaders(),
-      body: JSON.stringify({ profileId })
+      body: JSON.stringify({ systemUserId })
     });
     
     if (!response.ok) {
-      throw new Error('Failed to assign profile');
+      throw new Error('Failed to assign system user');
     }
     
     return response.json();
   },
 
-  async bulkAssignProfile(machineIds: number[], profileId: number | null): Promise<{ success: boolean; affected: number }> {
-    const response = await fetch(`${API_BASE}/systems/bulk/profile`, {
+  async bulkAssignSystemUser(machineIds: number[], systemUserId: number | null): Promise<{ success: boolean; affected: number }> {
+    const response = await fetch(`${API_BASE}/systems/bulk/system-user`, {
       method: 'PUT',
       headers: getAuthHeaders(),
-      body: JSON.stringify({ machineIds, profileId })
+      body: JSON.stringify({ machineIds, systemUserId })
     });
     
     if (!response.ok) {
-      throw new Error('Failed to bulk assign profile');
+      throw new Error('Failed to bulk assign system user');
     }
     
     return response.json();
@@ -352,34 +352,34 @@ export const api = {
     return response.json();
   },
 
-  // ==================== PROFILES ====================
-  async getProfiles(): Promise<Profile[]> {
-    const response = await fetch(`${API_BASE}/profiles`, {
+  // ==================== SYSTEM USERS ====================
+  async getSystemUsers(): Promise<SystemUser[]> {
+    const response = await fetch(`${API_BASE}/system-users`, {
       headers: getAuthHeaders()
     });
     
     if (!response.ok) {
-      throw new Error('Failed to fetch profiles');
+      throw new Error('Failed to fetch system users');
     }
     
     return response.json();
   },
 
-  async getProfile(id: number): Promise<Profile> {
-    const response = await fetch(`${API_BASE}/profiles/${id}`, {
+  async getSystemUser(id: number): Promise<SystemUser> {
+    const response = await fetch(`${API_BASE}/system-users/${id}`, {
       headers: getAuthHeaders()
     });
     
     if (!response.ok) {
-      throw new Error('Failed to fetch profile');
+      throw new Error('Failed to fetch system user');
     }
     
     return response.json();
   },
 
-  async createProfile(data: { profileName: string; description?: string; usbPolicy?: number }): Promise<Profile> {
-    console.log("API: Creating profile with data:", data);
-    const response = await fetch(`${API_BASE}/profiles`, {
+  async createSystemUser(data: { systemUserName: string; description?: string; usbPolicy?: number }): Promise<SystemUser> {
+    console.log("API: Creating system user with data:", data);
+    const response = await fetch(`${API_BASE}/system-users`, {
       method: 'POST',
       headers: getAuthHeaders(),
       body: JSON.stringify(data)
@@ -387,57 +387,57 @@ export const api = {
     
     if (!response.ok) {
       const errorText = await response.text();
-      console.error("API: Profile creation failed:", response.status, errorText);
+      console.error("API: System user creation failed:", response.status, errorText);
       let error;
       try {
         error = JSON.parse(errorText);
       } catch {
-        error = { error: errorText || 'Failed to create profile' };
+        error = { error: errorText || 'Failed to create system user' };
       }
-      throw new Error(error.error || `Failed to create profile (${response.status})`);
+      throw new Error(error.error || `Failed to create system user (${response.status})`);
     }
     
     const result = await response.json();
-    console.log("API: Profile created successfully:", result);
+    console.log("API: System user created successfully:", result);
     return result;
   },
 
-  async updateProfile(id: number, data: { profileName?: string; description?: string; isActive?: number; usbPolicy?: number }): Promise<Profile> {
-    const response = await fetch(`${API_BASE}/profiles/${id}`, {
+  async updateSystemUser(id: number, data: { systemUserName?: string; description?: string; isActive?: number; usbPolicy?: number }): Promise<SystemUser> {
+    const response = await fetch(`${API_BASE}/system-users/${id}`, {
       method: 'PUT',
       headers: getAuthHeaders(),
       body: JSON.stringify(data)
     });
     
     if (!response.ok) {
-      const error = await response.json().catch(() => ({ error: 'Failed to update profile' }));
-      throw new Error(error.error || 'Failed to update profile');
+      const error = await response.json().catch(() => ({ error: 'Failed to update system user' }));
+      throw new Error(error.error || 'Failed to update system user');
     }
     
     return response.json();
   },
 
-  async deleteProfile(id: number): Promise<{ success: boolean }> {
-    const response = await fetch(`${API_BASE}/profiles/${id}`, {
+  async deleteSystemUser(id: number): Promise<{ success: boolean }> {
+    const response = await fetch(`${API_BASE}/system-users/${id}`, {
       method: 'DELETE',
       headers: getAuthHeaders()
     });
     
     if (!response.ok) {
-      throw new Error('Failed to delete profile');
+      throw new Error('Failed to delete system user');
     }
     
     return response.json();
   },
 
-  async applyProfilePolicy(profileId: number): Promise<{ success: boolean; affected: number }> {
-    const response = await fetch(`${API_BASE}/profiles/${profileId}/apply-policy`, {
+  async applySystemUserPolicy(systemUserId: number): Promise<{ success: boolean; affected: number }> {
+    const response = await fetch(`${API_BASE}/system-users/${systemUserId}/apply-policy`, {
       method: 'POST',
       headers: getAuthHeaders()
     });
     
     if (!response.ok) {
-      throw new Error('Failed to apply profile policy');
+      throw new Error('Failed to apply system user policy');
     }
     
     return response.json();

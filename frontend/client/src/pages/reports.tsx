@@ -993,21 +993,21 @@ export default function ReportsPage() {
                     </div>
                   ) : (
                     <div className="space-y-3">
-                      {healthReport?.systemsByProfile.map((item) => {
+                      {healthReport?.systemsBySystemUser.map((item) => {
                         const total = healthReport.totalSystems || 1;
                         const percentage = (item.count / total) * 100;
                         return (
-                          <div key={item.profileId ?? 'none'} className="space-y-1">
+                          <div key={item.systemUserId ?? 'none'} className="space-y-1">
                             <div className="flex justify-between text-sm">
-                              <span className="font-medium">{item.profileName}</span>
+                              <span className="font-medium">{item.systemUserName}</span>
                               <span className="text-muted-foreground">{item.count} systems ({percentage.toFixed(1)}%)</span>
                             </div>
                             <Progress value={percentage} className="h-2" />
                           </div>
                         );
                       })}
-                      {(!healthReport?.systemsByProfile || healthReport.systemsByProfile.length === 0) && (
-                        <p className="text-sm text-muted-foreground text-center py-4">No profile data</p>
+                      {(!healthReport?.systemsBySystemUser || healthReport.systemsBySystemUser.length === 0) && (
+                        <p className="text-sm text-muted-foreground text-center py-4">No system user data</p>
                       )}
                     </div>
                   )}

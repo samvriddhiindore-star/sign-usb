@@ -17,11 +17,12 @@ export const admins = mysqlTable("admins", {
   updatedAt: timestamp("updated_at", { mode: "date" }).default(sql`CURRENT_TIMESTAMP`),
 });
 
-// Profile management table (define first for reference)
-export const profileMaster = mysqlTable("profile_master", {
-  profileId: int("profile_id").autoincrement().primaryKey(),
-  profileUid: varchar("profile_uid", { length: 36 }), // UUID stored as char(36)
-  profileName: varchar("profile_name", { length: 150 }).notNull(),
+// System Users management table (define first for reference)
+// Note: Database table and columns keep original names (profile_master, profile_id, etc.) for compatibility
+export const systemUsers = mysqlTable("profile_master", {
+  systemUserId: int("profile_id").autoincrement().primaryKey(),
+  systemUserUid: varchar("profile_uid", { length: 36 }), // UUID stored as char(36)
+  systemUserName: varchar("profile_name", { length: 150 }).notNull(),
   description: varchar("description", { length: 255 }),
   isActive: tinyint("is_active").default(1),
   usbPolicy: tinyint("usb_policy").default(0), // 0 = disabled, 1 = enabled
@@ -40,7 +41,7 @@ export const clientMaster = mysqlTable("client_master", {
   lastConnected: datetime("last_connected"),
   remark: varchar("remark", { length: 255 }),
   createdAt: timestamp("created_at", { mode: "date" }).default(sql`CURRENT_TIMESTAMP`),
-  profileId: int("profile_id").references(() => profileMaster.profileId, { onDelete: "set null" }),
+  systemUserId: int("profile_id").references(() => systemUsers.systemUserId, { onDelete: "set null" }),
 });
 
 // USB activity logs table
@@ -73,7 +74,7 @@ export const deviceMaster = mysqlTable("device_master", {
   id: int("id").autoincrement().primaryKey(),
   deviceUid: varchar("device_uid", { length: 36 }), // UUID stored as char(36)
   machineId: int("machine_id").references(() => clientMaster.machineId, { onDelete: "set null" }),
-  profileId: int("profile_id").references(() => profileMaster.profileId, { onDelete: "set null" }), // Device can be assigned to only one profile
+  systemUserId: int("profile_id").references(() => systemUsers.systemUserId, { onDelete: "set null" }), // Device can be assigned to only one system user
   deviceName: varchar("device_name", { length: 255 }).notNull(),
   deviceDescription: varchar("device_description", { length: 255 }), // Note: column name is device_description in DB
   deviceId: varchar("device_id", { length: 255 }),
@@ -104,9 +105,9 @@ export const insertClientUsbStatusSchema = createInsertSchema(clientUsbStatus).o
   createdAt: true,
 });
 
-export const insertProfileMasterSchema = createInsertSchema(profileMaster).omit({
-  profileId: true, // Can be set manually or auto-incremented
-  profileUid: true, // Auto-generated, don't include in insert
+export const insertSystemUserSchema = createInsertSchema(systemUsers).omit({
+  systemUserId: true, // Can be set manually or auto-incremented
+  systemUserUid: true, // Auto-generated, don't include in insert
   createdAt: true,
 });
 
@@ -127,7 +128,7 @@ export const insertDeviceMasterSchema = createInsertSchema(deviceMaster).omit({
 export type Admin = typeof admins.$inferSelect;
 export type ClientMaster = typeof clientMaster.$inferSelect;
 export type ClientUsbStatus = typeof clientUsbStatus.$inferSelect;
-export type ProfileMaster = typeof profileMaster.$inferSelect;
+export type SystemUser = typeof systemUsers.$inferSelect;
 export type UrlMaster = typeof urlMaster.$inferSelect;
 export type DeviceMaster = typeof deviceMaster.$inferSelect;
 
@@ -135,16 +136,16 @@ export type DeviceMaster = typeof deviceMaster.$inferSelect;
 export type InsertAdmin = z.infer<typeof insertAdminSchema>;
 export type InsertClientMaster = z.infer<typeof insertClientMasterSchema>;
 export type InsertClientUsbStatus = z.infer<typeof insertClientUsbStatusSchema>;
-export type InsertProfileMaster = z.infer<typeof insertProfileMasterSchema>;
+export type InsertSystemUser = z.infer<typeof insertSystemUserSchema>;
 export type InsertUrlMaster = z.infer<typeof insertUrlMasterSchema>;
 export type InsertDeviceMaster = z.infer<typeof insertDeviceMasterSchema>;
 
 // Extended types for API responses
-export type ClientWithProfile = ClientMaster & {
-  profile: ProfileMaster | null;
+export type ClientWithSystemUser = ClientMaster & {
+  systemUser: SystemUser | null;
 };
 
-export type ProfileWithMachines = ProfileMaster & {
+export type SystemUserWithMachines = SystemUser & {
   machines: ClientMaster[];
   assignedCount: number;
 };

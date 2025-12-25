@@ -9,8 +9,8 @@ export default function HelpIndex() {
     { href: "/help/login", title: "Login & Authentication", description: "How to log in and manage your session" },
     { href: "/help/dashboard", title: "Dashboard Overview", description: "Understanding your system's health and security status" },
     { href: "/help/machines", title: "Machine Management", description: "Managing registered systems and their USB access" },
-    { href: "/help/profiles", title: "Profile Management", description: "Creating and assigning USB access policies" },
-    { href: "/help/users", title: "User Management", description: "Managing admin users and their permissions" },
+    { href: "/help/system-users", title: "System User Management", description: "Creating and assigning USB access policies" },
+    { href: "/help/users", title: "Portal Users", description: "Managing portal users and their permissions" },
     { href: "/help/reports", title: "Reports & Analytics", description: "Comprehensive device and activity reports" },
     { href: "/help/website-control", title: "Website Access Control", description: "Managing allowed website URLs" },
     { href: "/help/logs", title: "USB Activity Logs", description: "Tracking USB device connections and disconnections" },
@@ -67,9 +67,9 @@ export default function HelpIndex() {
                 <ExternalLink className="h-3 w-3" />
                 View Reports
               </Link>
-              <Link href="/profiles" className="text-sm text-primary hover:underline flex items-center gap-1">
+              <Link href="/system-users" className="text-sm text-primary hover:underline flex items-center gap-1">
                 <ExternalLink className="h-3 w-3" />
-                Manage Profiles
+                Manage System Users
               </Link>
             </div>
           </CardContent>

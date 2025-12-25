@@ -11,8 +11,8 @@ export default function UsersHelp() {
             <BookOpen className="h-5 w-5" />
           </div>
           <div>
-            <h1 className="text-3xl font-bold tracking-tight">User Management</h1>
-            <p className="text-muted-foreground mt-1">Managing admin users and their permissions</p>
+            <h1 className="text-3xl font-bold tracking-tight">Portal Users</h1>
+            <p className="text-muted-foreground mt-1">Managing portal users and their permissions</p>
           </div>
         </div>
         <div className="p-3 bg-muted rounded-lg">
@@ -22,7 +22,7 @@ export default function UsersHelp() {
         <Card>
           <CardHeader><CardTitle>Overview</CardTitle></CardHeader>
           <CardContent className="text-sm space-y-2">
-            <p>Manage admin users, their roles, and access permissions.</p>
+            <p>Manage portal users, their roles, and access permissions.</p>
           </CardContent>
         </Card>
       </div>

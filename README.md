@@ -60,7 +60,7 @@ For detailed instructions on using the application, see the **[Knowledge Base](.
 - ✅ **Dashboard** - Real-time system health and KPI monitoring
 - ✅ **Machine Management** - Register and manage client systems
 - ✅ **Profile Management** - Create and assign USB access policies
-- ✅ **User Management** - Admin user CRUD operations
+- ✅ **Portal Users** - Portal user CRUD operations
 - ✅ **Reports & Analytics** - Comprehensive device and activity reports
 - ✅ **Website Access Control** - Manage allowed website URLs
 - ✅ **USB Activity Logs** - Track all USB device connections

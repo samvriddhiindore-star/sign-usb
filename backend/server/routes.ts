@@ -355,11 +355,11 @@ export async function registerRoutes(
           remark: s.remark,
           createdAt: s.createdAt?.toISOString() || null,
           status: isOnline ? 'online' : 'offline',
-          profileId: s.profileId,
-          profile: s.profile ? {
-            profileId: s.profile.profileId,
-            profileName: s.profile.profileName,
-            usbPolicy: s.profile.usbPolicy
+          systemUserId: s.systemUserId,
+          systemUser: s.systemUser ? {
+            systemUserId: s.systemUser.systemUserId,
+            systemUserName: s.systemUser.systemUserName,
+            usbPolicy: s.systemUser.usbPolicy
           } : null
         };
       }));
@@ -403,11 +403,11 @@ export async function registerRoutes(
         remark: system.remark,
         createdAt: system.createdAt?.toISOString() || null,
         status: isOnline ? 'online' : 'offline',
-        profileId: system.profileId,
-        profile: system.profile ? {
-          profileId: system.profile.profileId,
-          profileName: system.profile.profileName,
-          usbPolicy: system.profile.usbPolicy
+        systemUserId: system.systemUserId,
+        systemUser: system.systemUser ? {
+          systemUserId: system.systemUser.systemUserId,
+          systemUserName: system.systemUser.systemUserName,
+          usbPolicy: system.systemUser.usbPolicy
         } : null
       });
     } catch (error: any) {
@@ -492,41 +492,41 @@ export async function registerRoutes(
     }
   });
 
-  // Assign profile to a system
-  app.put("/api/systems/:id/profile", authMiddleware, async (req, res) => {
+  // Assign system user to a system
+  app.put("/api/systems/:id/system-user", authMiddleware, async (req, res) => {
     try {
       const id = parseInt(req.params.id);
       if (isNaN(id)) return res.status(400).json({ error: "Invalid system ID" });
       
       const schema = z.object({
-        profileId: z.number().nullable()
+        systemUserId: z.number().nullable()
       });
       
       const data = schema.parse(req.body);
       
-      const system = await storage.assignProfileToSystem(id, data.profileId);
+      const system = await storage.assignSystemUserToSystem(id, data.systemUserId);
       if (!system) return res.status(404).json({ error: "System not found" });
       
       res.json({ success: true, system: {
         machineId: system.machineId,
         pcName: system.pcName,
-        profileId: system.profileId
+        systemUserId: system.systemUserId
       }});
     } catch (error: any) {
       res.status(500).json({ error: error.message });
     }
   });
 
-  // Bulk assign profile
-  app.put("/api/systems/bulk/profile", authMiddleware, async (req, res) => {
+  // Bulk assign system user
+  app.put("/api/systems/bulk/system-user", authMiddleware, async (req, res) => {
     try {
       const schema = z.object({
         machineIds: z.array(z.number()),
-        profileId: z.number().nullable()
+        systemUserId: z.number().nullable()
       });
       
       const data = schema.parse(req.body);
-      const affected = await storage.bulkAssignProfile(data.machineIds, data.profileId);
+      const affected = await storage.bulkAssignSystemUser(data.machineIds, data.systemUserId);
       
       res.json({ success: true, affected });
     } catch (error: any) {
@@ -610,10 +610,10 @@ export async function registerRoutes(
     }
   });
 
-  // ==================== PROFILES ====================
-  app.get("/api/profiles", authMiddleware, async (req, res) => {
+  // ==================== SYSTEM USERS ====================
+  app.get("/api/system-users", authMiddleware, async (req, res) => {
     try {
-      const profiles = await storage.getProfiles();
+      const systemUsersList = await storage.getSystemUsers();
       
       // Helper function to check if system is online (last_connected within 1 minute)
       const isSystemOnline = (machineOn: number | null, lastConnected: Date | null): boolean => {
@@ -629,15 +629,15 @@ export async function registerRoutes(
         return diffInMinutes <= 1;
       };
       
-      res.json(profiles.map(p => ({
-        profileId: p.profileId,
-        profileUid: p.profileUid || null,
-        profileName: p.profileName,
-        description: p.description,
-        isActive: p.isActive,
-        usbPolicy: p.usbPolicy,
-        assignedCount: p.assignedCount,
-        machines: p.machines.map(m => {
+      res.json(systemUsersList.map(su => ({
+        systemUserId: su.systemUserId,
+        systemUserUid: su.systemUserUid || null,
+        systemUserName: su.systemUserName,
+        description: su.description,
+        isActive: su.isActive,
+        usbPolicy: su.usbPolicy,
+        assignedCount: su.assignedCount,
+        machines: su.machines.map(m => {
           const isOnline = isSystemOnline(m.machineOn, m.lastConnected);
           return {
             machineId: m.machineId,
@@ -649,20 +649,20 @@ export async function registerRoutes(
             lastConnected: m.lastConnected?.toISOString() || null
           };
         }),
-        createdAt: p.createdAt?.toISOString() || null
+        createdAt: su.createdAt?.toISOString() || null
       })));
     } catch (error: any) {
       res.status(500).json({ error: error.message });
     }
   });
 
-  app.get("/api/profiles/:id", authMiddleware, async (req, res) => {
+  app.get("/api/system-users/:id", authMiddleware, async (req, res) => {
     try {
       const id = parseInt(req.params.id);
-      if (isNaN(id)) return res.status(400).json({ error: "Invalid profile ID" });
+      if (isNaN(id)) return res.status(400).json({ error: "Invalid system user ID" });
       
-      const profile = await storage.getProfile(id);
-      if (!profile) return res.status(404).json({ error: "Profile not found" });
+      const systemUser = await storage.getSystemUser(id);
+      if (!systemUser) return res.status(404).json({ error: "System user not found" });
       
       // Helper function to check if system is online (last_connected within 1 minute)
       const isSystemOnline = (machineOn: number | null, lastConnected: Date | null): boolean => {
@@ -679,14 +679,14 @@ export async function registerRoutes(
       };
       
       res.json({
-        profileId: profile.profileId,
-        profileUid: profile.profileUid || null,
-        profileName: profile.profileName,
-        description: profile.description,
-        isActive: profile.isActive,
-        usbPolicy: profile.usbPolicy,
-        assignedCount: profile.assignedCount,
-        machines: profile.machines.map(m => {
+        systemUserId: systemUser.systemUserId,
+        systemUserUid: systemUser.systemUserUid || null,
+        systemUserName: systemUser.systemUserName,
+        description: systemUser.description,
+        isActive: systemUser.isActive,
+        usbPolicy: systemUser.usbPolicy,
+        assignedCount: systemUser.assignedCount,
+        machines: systemUser.machines.map(m => {
           const isOnline = isSystemOnline(m.machineOn, m.lastConnected);
           return {
             machineId: m.machineId,
@@ -698,16 +698,16 @@ export async function registerRoutes(
             lastConnected: m.lastConnected?.toISOString() || null
           };
         }),
-        createdAt: profile.createdAt?.toISOString() || null
+        createdAt: systemUser.createdAt?.toISOString() || null
       });
     } catch (error: any) {
       res.status(500).json({ error: error.message });
     }
   });
 
-  app.post("/api/profiles", authMiddleware, async (req, res) => {
+  app.post("/api/system-users", authMiddleware, async (req, res) => {
     try {
-      console.log("POST /api/profiles - Request body:", JSON.stringify(req.body, null, 2));
+      console.log("POST /api/system-users - Request body:", JSON.stringify(req.body, null, 2));
       
       // Preprocess: convert empty strings to undefined, string numbers to numbers
       const preprocessed = {
@@ -718,31 +718,31 @@ export async function registerRoutes(
       };
       
       const schema = z.object({
-        profileName: z.string().min(1),
+        systemUserName: z.string().min(1),
         description: z.string().optional(),
         usbPolicy: z.number().optional(),
         isActive: z.number().optional()
       });
       
       const data = schema.parse(preprocessed);
-      console.log("POST /api/profiles - Parsed data:", JSON.stringify(data, null, 2));
+      console.log("POST /api/system-users - Parsed data:", JSON.stringify(data, null, 2));
       
-      const profile = await storage.createProfile(data);
-      console.log("POST /api/profiles - Created profile:", profile.profileId);
+      const systemUser = await storage.createSystemUser(data);
+      console.log("POST /api/system-users - Created system user:", systemUser.systemUserId);
       
-      // Return in the same format as GET /api/profiles
+      // Return in the same format as GET /api/system-users
       try {
-        const profileWithMachines = await storage.getProfile(profile.profileId);
-        if (profileWithMachines) {
+        const systemUserWithMachines = await storage.getSystemUser(systemUser.systemUserId);
+        if (systemUserWithMachines) {
           return res.status(201).json({
-            profileId: profileWithMachines.profileId,
-            profileUid: profileWithMachines.profileUid || null,
-            profileName: profileWithMachines.profileName,
-            description: profileWithMachines.description,
-            isActive: profileWithMachines.isActive,
-            usbPolicy: profileWithMachines.usbPolicy,
-            assignedCount: profileWithMachines.assignedCount,
-            machines: profileWithMachines.machines.map(m => {
+            systemUserId: systemUserWithMachines.systemUserId,
+            systemUserUid: systemUserWithMachines.systemUserUid || null,
+            systemUserName: systemUserWithMachines.systemUserName,
+            description: systemUserWithMachines.description,
+            isActive: systemUserWithMachines.isActive,
+            usbPolicy: systemUserWithMachines.usbPolicy,
+            assignedCount: systemUserWithMachines.assignedCount,
+            machines: systemUserWithMachines.machines.map(m => {
               // Helper function to check if system is online (last_connected within 1 minute)
               const isSystemOnline = (machineOn: number | null, lastConnected: Date | null): boolean => {
                 if (machineOn === 0) return false;
@@ -768,27 +768,27 @@ export async function registerRoutes(
                 lastConnected: m.lastConnected?.toISOString() || null
               };
             }),
-            createdAt: profileWithMachines.createdAt?.toISOString() || null
+            createdAt: systemUserWithMachines.createdAt?.toISOString() || null
           });
         }
-      } catch (getProfileError: any) {
-        console.error("Error fetching profile with machines, using fallback:", getProfileError);
+      } catch (getSystemUserError: any) {
+        console.error("Error fetching system user with machines, using fallback:", getSystemUserError);
       }
       
-      // Fallback to basic profile if getProfile fails
+      // Fallback to basic system user if getSystemUser fails
       return res.status(201).json({
-        profileId: profile.profileId,
-        profileUid: profile.profileUid || null,
-        profileName: profile.profileName,
-        description: profile.description,
-        isActive: profile.isActive,
-        usbPolicy: profile.usbPolicy,
+        systemUserId: systemUser.systemUserId,
+        systemUserUid: systemUser.systemUserUid || null,
+        systemUserName: systemUser.systemUserName,
+        description: systemUser.description,
+        isActive: systemUser.isActive,
+        usbPolicy: systemUser.usbPolicy,
         assignedCount: 0,
         machines: [],
-        createdAt: profile.createdAt?.toISOString() || null
+        createdAt: systemUser.createdAt?.toISOString() || null
       });
     } catch (error: any) {
-      console.error("Error creating profile:", error);
+      console.error("Error creating system user:", error);
       console.error("Error stack:", error.stack);
       // Check if it's a Zod validation error
       if (error.name === 'ZodError' || error.issues) {
@@ -797,66 +797,66 @@ export async function registerRoutes(
         console.error("Zod validation error:", JSON.stringify(zodError, null, 2));
         return res.status(400).json({ error: errorMessage });
       }
-      res.status(400).json({ error: error.message || 'Failed to create profile' });
+      res.status(400).json({ error: error.message || 'Failed to create system user' });
     }
   });
 
-  app.put("/api/profiles/:id", authMiddleware, async (req, res) => {
+  app.put("/api/system-users/:id", authMiddleware, async (req, res) => {
     try {
       const id = parseInt(req.params.id);
-      if (isNaN(id)) return res.status(400).json({ error: "Invalid profile ID" });
+      if (isNaN(id)) return res.status(400).json({ error: "Invalid system user ID" });
       
       const schema = z.object({
-        profileName: z.string().min(1).optional(),
+        systemUserName: z.string().min(1).optional(),
         description: z.string().optional(),
         usbPolicy: z.number().optional(),
         isActive: z.number().optional()
       });
       
       const data = schema.parse(req.body);
-      const profile = await storage.updateProfile(id, data);
-      if (!profile) return res.status(404).json({ error: "Profile not found" });
+      const systemUser = await storage.updateSystemUser(id, data);
+      if (!systemUser) return res.status(404).json({ error: "System user not found" });
       
       res.json({
-        profileId: profile.profileId,
-        profileName: profile.profileName,
-        description: profile.description,
-        isActive: profile.isActive,
-        usbPolicy: profile.usbPolicy,
-        createdAt: profile.createdAt?.toISOString() || null
+        systemUserId: systemUser.systemUserId,
+        systemUserName: systemUser.systemUserName,
+        description: systemUser.description,
+        isActive: systemUser.isActive,
+        usbPolicy: systemUser.usbPolicy,
+        createdAt: systemUser.createdAt?.toISOString() || null
       });
     } catch (error: any) {
       res.status(400).json({ error: error.message });
     }
   });
 
-  app.delete("/api/profiles/:id", authMiddleware, async (req, res) => {
+  app.delete("/api/system-users/:id", authMiddleware, async (req, res) => {
     try {
       const id = parseInt(req.params.id);
-      if (isNaN(id)) return res.status(400).json({ error: "Invalid profile ID" });
+      if (isNaN(id)) return res.status(400).json({ error: "Invalid system user ID" });
       
-      const success = await storage.deleteProfile(id);
-      if (!success) return res.status(404).json({ error: "Profile not found" });
+      const success = await storage.deleteSystemUser(id);
+      if (!success) return res.status(404).json({ error: "System user not found" });
       
-      res.json({ success: true, message: "Profile deleted successfully" });
+      res.json({ success: true, message: "System user deleted successfully" });
     } catch (error: any) {
       res.status(500).json({ error: error.message });
     }
   });
 
-  // Apply USB policy from profile to all assigned machines
-  app.post("/api/profiles/:id/apply-policy", authMiddleware, async (req, res) => {
+  // Apply USB policy from system user to all assigned machines
+  app.post("/api/system-users/:id/apply-policy", authMiddleware, async (req, res) => {
     try {
       const id = parseInt(req.params.id);
-      if (isNaN(id)) return res.status(400).json({ error: "Invalid profile ID" });
+      if (isNaN(id)) return res.status(400).json({ error: "Invalid system user ID" });
       
-      const affected = await storage.applyProfileUsbPolicy(id);
+      const affected = await storage.applySystemUserUsbPolicy(id);
       
-      // Get machines assigned to this profile and send commands
-      const profile = await storage.getProfile(id);
-      if (profile) {
-        const command = profile.usbPolicy === 1 ? "EnableUsb" : "DisableUsb";
-        for (const machine of profile.machines) {
+      // Get machines assigned to this system user and send commands
+      const systemUser = await storage.getSystemUser(id);
+      if (systemUser) {
+        const command = systemUser.usbPolicy === 1 ? "EnableUsb" : "DisableUsb";
+        for (const machine of systemUser.machines) {
           if (machine.machineOn === 1) {
             sendCommandToAgent(machine.macId, io, command, { machineId: machine.machineId });
           }
@@ -980,7 +980,7 @@ export async function registerRoutes(
         id: d.id,
         deviceUid: d.deviceUid || null,
         machineId: d.machineId,
-        profileId: d.profileId || null,
+        systemUserId: d.systemUserId || null,
         pcName: d.pcName || null,
         deviceName: d.deviceName,
         description: d.description,
@@ -1032,7 +1032,7 @@ export async function registerRoutes(
         id: d.id,
         deviceUid: d.deviceUid || null,
         machineId: d.machineId,
-        profileId: d.profileId || null,
+        systemUserId: d.systemUserId || null,
         deviceName: d.deviceName,
         description: d.description,
         deviceId: d.deviceId,
@@ -1050,7 +1050,7 @@ export async function registerRoutes(
     try {
       const schema = z.object({
         machineId: z.number().nullable().optional(),
-        profileId: z.number().nullable().optional(), // Device can be assigned to only one profile
+        systemUserId: z.number().nullable().optional(), // Device can be assigned to only one system user
         deviceName: z.string().min(1),
         description: z.string().optional(),
         deviceId: z.string().optional(),
@@ -1086,7 +1086,7 @@ export async function registerRoutes(
       
       const schema = z.object({
         machineId: z.number().nullable().optional(),
-        profileId: z.number().nullable().optional(), // Device can be assigned to only one profile
+        systemUserId: z.number().nullable().optional(), // Device can be assigned to only one system user
         deviceName: z.string().min(1).optional(),
         description: z.string().optional(),
         deviceId: z.string().optional(),
@@ -1309,7 +1309,7 @@ export async function registerRoutes(
           id: d.id,
           deviceUid: d.deviceUid || null,
           machineId: d.machineId,
-          profileId: d.profileId || null,
+          systemUserId: d.systemUserId || null,
           deviceName: d.deviceName,
           description: d.description || null,
           deviceId: d.deviceId,
@@ -1406,7 +1406,7 @@ export async function registerRoutes(
       };
       
       const csv = [
-        ['Machine ID', 'PC Name', 'MAC ID', 'USB Status', 'Online Status', 'Profile', 'Last Connected', 'Created At'].join(','),
+        ['Machine ID', 'PC Name', 'MAC ID', 'USB Status', 'Online Status', 'System User', 'Last Connected', 'Created At'].join(','),
         ...systems.map(s => {
           const isOnline = isSystemOnline(s.machineOn, s.lastConnected);
           return [
@@ -1415,7 +1415,7 @@ export async function registerRoutes(
             s.macId || '',
             s.usbStatus === 1 ? 'Enabled' : 'Disabled',
             isOnline ? 'Online' : 'Offline',
-            s.profile?.profileName || 'No Profile',
+            s.systemUser?.systemUserName || 'No System User',
             s.lastConnected?.toISOString() || '',
             s.createdAt?.toISOString() || ''
           ].join(',');

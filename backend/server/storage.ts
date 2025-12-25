@@ -3,25 +3,25 @@ import { db } from "./db";
 import { 
   clientMaster,
   clientUsbStatus,
-  profileMaster,
+  systemUsers,
   urlMaster,
   deviceMaster,
   admins,
   type ClientMaster,
   type ClientUsbStatus,
-  type ProfileMaster,
+  type SystemUser,
   type UrlMaster,
   type DeviceMaster,
   type Admin,
   type InsertClientMaster,
   type InsertClientUsbStatus,
-  type InsertProfileMaster,
+  type InsertSystemUser,
   type InsertUrlMaster,
   type InsertDeviceMaster,
   type InsertAdmin,
   type DashboardStats,
-  type ClientWithProfile,
-  type ProfileWithMachines,
+  type ClientWithSystemUser,
+  type SystemUserWithMachines,
   type DeviceMasterWithDescription
 } from "../shared/schema";
 import { eq, desc, and, sql, gte, isNull, count, inArray, max, ne } from "drizzle-orm";
@@ -39,8 +39,8 @@ export interface IStorage {
   deleteAdmin(id: number): Promise<boolean>;
   
   // Client Master (Systems)
-  getSystems(): Promise<ClientWithProfile[]>;
-  getSystem(machineId: number): Promise<ClientWithProfile | undefined>;
+  getSystems(): Promise<ClientWithSystemUser[]>;
+  getSystem(machineId: number): Promise<ClientWithSystemUser | undefined>;
   getSystemByMacId(macId: string): Promise<ClientMaster | undefined>;
   createSystem(system: InsertClientMaster): Promise<ClientMaster>;
   updateSystem(machineId: number, updates: Partial<ClientMaster>): Promise<ClientMaster | undefined>;
@@ -48,9 +48,9 @@ export interface IStorage {
   updateSystemUsbStatus(machineId: number, usbStatus: number): Promise<ClientMaster | undefined>;
   bulkUpdateUsbStatus(machineIds: number[], usbStatus: number): Promise<number>;
   getDisconnectedSystems(dayThreshold: number): Promise<ClientMaster[]>;
-  assignProfileToSystem(machineId: number, profileId: number | null): Promise<ClientMaster | undefined>;
-  bulkAssignProfile(machineIds: number[], profileId: number | null): Promise<number>;
-  getSystemsByProfile(profileId: number): Promise<ClientMaster[]>;
+  assignSystemUserToSystem(machineId: number, systemUserId: number | null): Promise<ClientMaster | undefined>;
+  bulkAssignSystemUser(machineIds: number[], systemUserId: number | null): Promise<number>;
+  getSystemsBySystemUser(systemUserId: number): Promise<ClientMaster[]>;
   
   // USB Logs
   getUsbLogs(limit?: number): Promise<(ClientUsbStatus & { pcName?: string })[]>;
@@ -59,13 +59,13 @@ export interface IStorage {
   createUsbLog(log: InsertClientUsbStatus): Promise<ClientUsbStatus>;
   updateUsbLog(id: number, updates: Partial<ClientUsbStatus>): Promise<ClientUsbStatus | undefined>;
   
-  // Profiles
-  getProfiles(): Promise<ProfileWithMachines[]>;
-  getProfile(profileId: number): Promise<ProfileWithMachines | undefined>;
-  createProfile(profile: InsertProfileMaster): Promise<ProfileMaster>;
-  updateProfile(profileId: number, updates: Partial<ProfileMaster>): Promise<ProfileMaster | undefined>;
-  deleteProfile(profileId: number): Promise<boolean>;
-  applyProfileUsbPolicy(profileId: number): Promise<number>;
+  // System Users
+  getSystemUsers(): Promise<SystemUserWithMachines[]>;
+  getSystemUser(systemUserId: number): Promise<SystemUserWithMachines | undefined>;
+  createSystemUser(systemUser: InsertSystemUser): Promise<SystemUser>;
+  updateSystemUser(systemUserId: number, updates: Partial<SystemUser>): Promise<SystemUser | undefined>;
+  deleteSystemUser(systemUserId: number): Promise<boolean>;
+  applySystemUserUsbPolicy(systemUserId: number): Promise<number>;
   
   // URL Master (Website Access Control)
   getUrls(): Promise<UrlMaster[]>;
@@ -205,7 +205,7 @@ class DatabaseStorage implements IStorage {
   }
 
   // ==================== CLIENT MASTER (SYSTEMS) METHODS ====================
-  async getSystems(): Promise<ClientWithProfile[]> {
+  async getSystems(): Promise<ClientWithSystemUser[]> {
     const result = await db
       .select({
         machineId: clientMaster.machineId,
@@ -216,11 +216,11 @@ class DatabaseStorage implements IStorage {
         lastConnected: clientMaster.lastConnected,
         remark: clientMaster.remark,
         createdAt: clientMaster.createdAt,
-        profileId: clientMaster.profileId,
-        profile: profileMaster,
+        systemUserId: clientMaster.systemUserId,
+        systemUser: systemUsers,
       })
       .from(clientMaster)
-      .leftJoin(profileMaster, eq(clientMaster.profileId, profileMaster.profileId))
+      .leftJoin(systemUsers, eq(clientMaster.systemUserId, systemUsers.systemUserId))
       .orderBy(desc(clientMaster.lastConnected));
     
     return result.map(row => ({
@@ -232,12 +232,12 @@ class DatabaseStorage implements IStorage {
       lastConnected: row.lastConnected,
       remark: row.remark,
       createdAt: row.createdAt,
-      profileId: row.profileId,
-      profile: row.profile,
+      systemUserId: row.systemUserId,
+      systemUser: row.systemUser,
     }));
   }
 
-  async getSystem(machineId: number): Promise<ClientWithProfile | undefined> {
+  async getSystem(machineId: number): Promise<ClientWithSystemUser | undefined> {
     const result = await db
       .select({
         machineId: clientMaster.machineId,
@@ -248,11 +248,11 @@ class DatabaseStorage implements IStorage {
         lastConnected: clientMaster.lastConnected,
         remark: clientMaster.remark,
         createdAt: clientMaster.createdAt,
-        profileId: clientMaster.profileId,
-        profile: profileMaster,
+        systemUserId: clientMaster.systemUserId,
+        systemUser: systemUsers,
       })
       .from(clientMaster)
-      .leftJoin(profileMaster, eq(clientMaster.profileId, profileMaster.profileId))
+      .leftJoin(systemUsers, eq(clientMaster.systemUserId, systemUsers.systemUserId))
       .where(eq(clientMaster.machineId, machineId))
       .limit(1);
     
@@ -268,8 +268,8 @@ class DatabaseStorage implements IStorage {
       lastConnected: row.lastConnected,
       remark: row.remark,
       createdAt: row.createdAt,
-      profileId: row.profileId,
-      profile: row.profile,
+      systemUserId: row.systemUserId,
+      systemUser: row.systemUser,
     };
   }
 
@@ -326,71 +326,71 @@ class DatabaseStorage implements IStorage {
     return result;
   }
 
-  async assignProfileToSystem(machineId: number, profileId: number | null): Promise<ClientMaster | undefined> {
-    // Enforce one profile per machine: if assigning a profile, unassign it from any other machine first
-    if (profileId !== null) {
-      // Find any other machine that has this profile assigned
+  async assignSystemUserToSystem(machineId: number, systemUserId: number | null): Promise<ClientMaster | undefined> {
+    // Enforce one system user per machine: if assigning a system user, unassign it from any other machine first
+    if (systemUserId !== null) {
+      // Find any other machine that has this system user assigned
       const existingMachines = await db.select()
         .from(clientMaster)
         .where(and(
-          eq(clientMaster.profileId, profileId),
+          eq(clientMaster.systemUserId, systemUserId),
           ne(clientMaster.machineId, machineId)
         ));
       
-      // Unassign the profile from other machines
+      // Unassign the system user from other machines
       if (existingMachines.length > 0) {
         await db.update(clientMaster)
-          .set({ profileId: null })
+          .set({ systemUserId: null })
           .where(and(
-            eq(clientMaster.profileId, profileId),
+            eq(clientMaster.systemUserId, systemUserId),
             ne(clientMaster.machineId, machineId)
           ));
       }
     }
     
-    // Assign the profile to the requested machine
+    // Assign the system user to the requested machine
     await db.update(clientMaster)
-      .set({ profileId })
+      .set({ systemUserId })
       .where(eq(clientMaster.machineId, machineId));
     
     const result = await db.select().from(clientMaster).where(eq(clientMaster.machineId, machineId)).limit(1);
     return result[0];
   }
 
-  async bulkAssignProfile(machineIds: number[], profileId: number | null): Promise<number> {
+  async bulkAssignSystemUser(machineIds: number[], systemUserId: number | null): Promise<number> {
     if (machineIds.length === 0) return 0;
     
-    // Enforce one profile per machine: if assigning a profile, unassign it from any other machines first
-    if (profileId !== null) {
-      // Find any machines that have this profile assigned (excluding the ones we're assigning to)
+    // Enforce one system user per machine: if assigning a system user, unassign it from any other machines first
+    if (systemUserId !== null) {
+      // Find any machines that have this system user assigned (excluding the ones we're assigning to)
       const existingMachines = await db.select()
         .from(clientMaster)
         .where(and(
-          eq(clientMaster.profileId, profileId),
+          eq(clientMaster.systemUserId, systemUserId),
           sql`${clientMaster.machineId} NOT IN (${sql.join(machineIds.map(id => sql`${id}`), sql`, `)})`
         ));
       
-      // Unassign the profile from other machines
+      // Unassign the system user from other machines
       if (existingMachines.length > 0) {
         await db.update(clientMaster)
-          .set({ profileId: null })
+          .set({ systemUserId: null })
           .where(and(
-            eq(clientMaster.profileId, profileId),
+            eq(clientMaster.systemUserId, systemUserId),
             sql`${clientMaster.machineId} NOT IN (${sql.join(machineIds.map(id => sql`${id}`), sql`, `)})`
           ));
       }
     }
     
-    // Assign the profile to the requested machines
+    // Assign the system user to the requested machines
     const result = await db.update(clientMaster)
-      .set({ profileId })
+      .set({ systemUserId })
       .where(inArray(clientMaster.machineId, machineIds));
     return (result as any).affectedRows ?? machineIds.length;
   }
 
-  async getSystemsByProfile(profileId: number): Promise<ClientMaster[]> {
+  async getSystemsBySystemUser(systemUserId: number): Promise<ClientMaster[]> {
     return await db.select().from(clientMaster)
-      .where(eq(clientMaster.profileId, profileId))
+      .where(eq(clientMaster.systemUserId, systemUserId))
       .orderBy(desc(clientMaster.lastConnected));
   }
 
@@ -473,28 +473,28 @@ class DatabaseStorage implements IStorage {
   }
 
   // ==================== PROFILE METHODS ====================
-  async getProfiles(): Promise<ProfileWithMachines[]> {
-    const profiles = await db.select().from(profileMaster).orderBy(desc(profileMaster.createdAt));
+  async getSystemUsers(): Promise<SystemUserWithMachines[]> {
+    const systemUsersList = await db.select().from(systemUsers).orderBy(desc(systemUsers.createdAt));
     
-    const profilesWithMachines = await Promise.all(
-      profiles.map(async (profile) => {
-        const machines = await this.getSystemsByProfile(profile.profileId);
+    const systemUsersWithMachines = await Promise.all(
+      systemUsersList.map(async (systemUser) => {
+        const machines = await this.getSystemsBySystemUser(systemUser.systemUserId);
         return {
-          ...profile,
+          ...systemUser,
           machines,
           assignedCount: machines.length
         };
       })
     );
     
-    return profilesWithMachines;
+    return systemUsersWithMachines;
   }
 
-  async getProfile(profileId: number): Promise<ProfileWithMachines | undefined> {
-    const result = await db.select().from(profileMaster).where(eq(profileMaster.profileId, profileId)).limit(1);
+  async getSystemUser(systemUserId: number): Promise<SystemUserWithMachines | undefined> {
+    const result = await db.select().from(systemUsers).where(eq(systemUsers.systemUserId, systemUserId)).limit(1);
     if (!result[0]) return undefined;
     
-    const machines = await this.getSystemsByProfile(profileId);
+    const machines = await this.getSystemsBySystemUser(systemUserId);
     return {
       ...result[0],
       machines,
@@ -502,50 +502,50 @@ class DatabaseStorage implements IStorage {
     };
   }
 
-  async createProfile(profile: InsertProfileMaster): Promise<ProfileMaster> {
+  async createSystemUser(systemUser: InsertSystemUser): Promise<SystemUser> {
     try {
-      // Generate UUID for profile_uid
-      const profileUid = randomUUID();
+      // Generate UUID for system_user_uid
+      const systemUserUid = randomUUID();
       
-      // Get the maximum profileId from the table and increment by 1
+      // Get the maximum systemUserId from the table and increment by 1
       const maxIdResult = await db
-        .select({ maxId: max(profileMaster.profileId) })
-        .from(profileMaster);
+        .select({ maxId: max(systemUsers.systemUserId) })
+        .from(systemUsers);
       
       const nextId = (maxIdResult[0]?.maxId || 0) + 1;
       
-      console.log(`createProfile - Max ID: ${maxIdResult[0]?.maxId || 0}, Next ID: ${nextId}`);
+      console.log(`createSystemUser - Max ID: ${maxIdResult[0]?.maxId || 0}, Next ID: ${nextId}`);
       
       // Insert with the calculated ID
-      await db.insert(profileMaster).values({
-        ...profile,
-        profileId: nextId,
-        profileUid
+      await db.insert(systemUsers).values({
+        ...systemUser,
+        systemUserId: nextId,
+        systemUserUid
       });
       
-      // Retrieve the created profile
-      const created = await db.select().from(profileMaster)
-        .where(eq(profileMaster.profileId, nextId))
+      // Retrieve the created system user
+      const created = await db.select().from(systemUsers)
+        .where(eq(systemUsers.systemUserId, nextId))
         .limit(1);
       
       if (!created[0]) {
-        throw new Error("Failed to retrieve created profile");
+        throw new Error("Failed to retrieve created system user");
       }
       
-      console.log(`createProfile - Successfully created profile with ID: ${nextId}`);
+      console.log(`createSystemUser - Successfully created system user with ID: ${nextId}`);
       return created[0];
       
     } catch (error: any) {
-      console.error("createProfile error:", error);
+      console.error("createSystemUser error:", error);
       
       // If insertion failed, try to find by name as fallback
-      if (profile.profileName && error.code !== 'ER_DUP_ENTRY') {
-        const found = await db.select().from(profileMaster)
-          .where(eq(profileMaster.profileName, profile.profileName))
-          .orderBy(desc(profileMaster.createdAt))
+      if (systemUser.systemUserName && error.code !== 'ER_DUP_ENTRY') {
+        const found = await db.select().from(systemUsers)
+          .where(eq(systemUsers.systemUserName, systemUser.systemUserName))
+          .orderBy(desc(systemUsers.createdAt))
           .limit(1);
         if (found[0]) {
-          console.log(`createProfile - Found existing profile by name: ${found[0].profileId}`);
+          console.log(`createSystemUser - Found existing system user by name: ${found[0].systemUserId}`);
           return found[0];
         }
       }
@@ -553,29 +553,29 @@ class DatabaseStorage implements IStorage {
     }
   }
 
-  async updateProfile(profileId: number, updates: Partial<ProfileMaster>): Promise<ProfileMaster | undefined> {
-    await db.update(profileMaster).set(updates).where(eq(profileMaster.profileId, profileId));
-    const result = await db.select().from(profileMaster).where(eq(profileMaster.profileId, profileId)).limit(1);
+  async updateSystemUser(systemUserId: number, updates: Partial<SystemUser>): Promise<SystemUser | undefined> {
+    await db.update(systemUsers).set(updates).where(eq(systemUsers.systemUserId, systemUserId));
+    const result = await db.select().from(systemUsers).where(eq(systemUsers.systemUserId, systemUserId)).limit(1);
     return result[0];
   }
 
-  async deleteProfile(profileId: number): Promise<boolean> {
-    // First remove profile from all machines
+  async deleteSystemUser(systemUserId: number): Promise<boolean> {
+    // First remove system user from all machines
     await db.update(clientMaster)
-      .set({ profileId: null })
-      .where(eq(clientMaster.profileId, profileId));
+      .set({ systemUserId: null })
+      .where(eq(clientMaster.systemUserId, systemUserId));
     
-    const result = await db.delete(profileMaster).where(eq(profileMaster.profileId, profileId));
+    const result = await db.delete(systemUsers).where(eq(systemUsers.systemUserId, systemUserId));
     return (result as any).affectedRows !== undefined ? (result as any).affectedRows > 0 : true;
   }
 
-  async applyProfileUsbPolicy(profileId: number): Promise<number> {
-    const profile = await db.select().from(profileMaster).where(eq(profileMaster.profileId, profileId)).limit(1);
-    if (!profile[0]) return 0;
+  async applySystemUserUsbPolicy(systemUserId: number): Promise<number> {
+    const systemUser = await db.select().from(systemUsers).where(eq(systemUsers.systemUserId, systemUserId)).limit(1);
+    if (!systemUser[0]) return 0;
     
     const result = await db.update(clientMaster)
-      .set({ usbStatus: profile[0].usbPolicy })
-      .where(eq(clientMaster.profileId, profileId));
+      .set({ usbStatus: systemUser[0].usbPolicy })
+      .where(eq(clientMaster.systemUserId, systemUserId));
     
     return (result as any).affectedRows ?? 0;
   }
@@ -621,7 +621,7 @@ class DatabaseStorage implements IStorage {
         id: deviceMaster.id,
         deviceUid: deviceMaster.deviceUid,
         machineId: deviceMaster.machineId,
-        profileId: deviceMaster.profileId,
+        systemUserId: deviceMaster.systemUserId,
         deviceName: deviceMaster.deviceName,
         deviceDescription: deviceMaster.deviceDescription,
         deviceId: deviceMaster.deviceId,
@@ -652,7 +652,7 @@ class DatabaseStorage implements IStorage {
         id: deviceMaster.id,
         deviceUid: deviceMaster.deviceUid,
         machineId: deviceMaster.machineId,
-        profileId: deviceMaster.profileId,
+        systemUserId: deviceMaster.systemUserId,
         deviceName: deviceMaster.deviceName,
         deviceDescription: deviceMaster.deviceDescription,
         deviceId: deviceMaster.deviceId,
@@ -682,7 +682,7 @@ class DatabaseStorage implements IStorage {
         id: deviceMaster.id,
         deviceUid: deviceMaster.deviceUid,
         machineId: deviceMaster.machineId,
-        profileId: deviceMaster.profileId,
+        systemUserId: deviceMaster.systemUserId,
         deviceName: deviceMaster.deviceName,
         deviceDescription: deviceMaster.deviceDescription,
         deviceId: deviceMaster.deviceId,
@@ -712,7 +712,7 @@ class DatabaseStorage implements IStorage {
         id: deviceMaster.id,
         deviceUid: deviceMaster.deviceUid,
         machineId: deviceMaster.machineId,
-        profileId: deviceMaster.profileId,
+        systemUserId: deviceMaster.systemUserId,
         deviceName: deviceMaster.deviceName,
         deviceDescription: deviceMaster.deviceDescription,
         deviceId: deviceMaster.deviceId,
@@ -750,10 +750,10 @@ class DatabaseStorage implements IStorage {
     }
     
     // Enforce one profile per device: if assigning a profile, unassign it from any other device first
-    if (deviceData.profileId !== null && deviceData.profileId !== undefined) {
+    if (deviceData.systemUserId !== null && deviceData.systemUserId !== undefined) {
       await db.update(deviceMaster)
-        .set({ profileId: null })
-        .where(eq(deviceMaster.profileId, deviceData.profileId));
+        .set({ systemUserId: null })
+        .where(eq(deviceMaster.systemUserId, deviceData.systemUserId));
     }
     
     const result = await db.insert(deviceMaster).values(deviceData);
@@ -773,11 +773,11 @@ class DatabaseStorage implements IStorage {
     }
     
     // Enforce one profile per device: if assigning a profile, unassign it from any other device first
-    if (updateData.profileId !== null && updateData.profileId !== undefined) {
+    if (updateData.systemUserId !== null && updateData.systemUserId !== undefined) {
       await db.update(deviceMaster)
-        .set({ profileId: null })
+        .set({ systemUserId: null })
         .where(and(
-          eq(deviceMaster.profileId, updateData.profileId),
+          eq(deviceMaster.systemUserId, updateData.systemUserId),
           ne(deviceMaster.id, id)
         ));
     }
@@ -1094,7 +1094,7 @@ class DatabaseStorage implements IStorage {
     offlineSystems: number;
     usbEnabledSystems: number;
     usbDisabledSystems: number;
-    systemsByProfile: { profileId: number | null; profileName: string; count: number }[];
+    systemsBySystemUser: { systemUserId: number | null; systemUserName: string; count: number }[];
     systemsWithDevices: { machineId: number; pcName: string; deviceCount: number }[];
     inactiveSystems: ClientMaster[];
   }> {
@@ -1120,20 +1120,20 @@ class DatabaseStorage implements IStorage {
 
     const usbDisabledSystems = totalSystems - usbEnabledSystems;
 
-    // Systems by profile
-    const systemsByProfileRaw = await db
+    // Systems by system user
+    const systemsBySystemUserRaw = await db
       .select({
-        profileId: clientMaster.profileId,
-        profileName: profileMaster.profileName,
+        systemUserId: clientMaster.systemUserId,
+        systemUserName: systemUsers.systemUserName,
         count: count()
       })
       .from(clientMaster)
-      .leftJoin(profileMaster, eq(clientMaster.profileId, profileMaster.profileId))
-      .groupBy(clientMaster.profileId, profileMaster.profileName);
+      .leftJoin(systemUsers, eq(clientMaster.systemUserId, systemUsers.systemUserId))
+      .groupBy(clientMaster.systemUserId, systemUsers.systemUserName);
 
-    const systemsByProfile = systemsByProfileRaw.map(r => ({
-      profileId: r.profileId,
-      profileName: r.profileName || 'No Profile',
+    const systemsBySystemUser = systemsBySystemUserRaw.map(r => ({
+      systemUserId: r.systemUserId,
+      systemUserName: r.systemUserName || 'No System User',
       count: r.count
     }));
 
@@ -1164,7 +1164,7 @@ class DatabaseStorage implements IStorage {
       offlineSystems,
       usbEnabledSystems,
       usbDisabledSystems,
-      systemsByProfile,
+      systemsBySystemUser,
       systemsWithDevices,
       inactiveSystems
     };
