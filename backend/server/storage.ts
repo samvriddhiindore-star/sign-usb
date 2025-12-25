@@ -399,6 +399,7 @@ class DatabaseStorage implements IStorage {
     const result = await db
       .select({
         id: clientUsbStatus.id,
+        logUid: clientUsbStatus.logUid,
         machineId: clientUsbStatus.machineId,
         deviceName: clientUsbStatus.deviceName,
         deviceDescription: clientUsbStatus.deviceDescription,
@@ -1009,21 +1010,26 @@ class DatabaseStorage implements IStorage {
     }
 
     // Total events
-    const totalResult = await db.select({ count: count() }).from(clientUsbStatus).where(whereClause);
+    const totalResult = whereClause 
+      ? await db.select({ count: count() }).from(clientUsbStatus).where(whereClause)
+      : await db.select({ count: count() }).from(clientUsbStatus);
     const totalEvents = totalResult[0]?.count || 0;
 
     // Events by machine
-    const byMachineRaw = await db
+    let byMachineQuery = db
       .select({
         machineId: clientUsbStatus.machineId,
         pcName: clientMaster.pcName,
         eventCount: count()
       })
       .from(clientUsbStatus)
-      .leftJoin(clientMaster, eq(clientUsbStatus.machineId, clientMaster.machineId))
-      .where(whereClause)
+      .leftJoin(clientMaster, eq(clientUsbStatus.machineId, clientMaster.machineId));
+    if (whereClause) {
+      byMachineQuery = byMachineQuery.where(whereClause);
+    }
+    const byMachineRaw = await byMachineQuery
       .groupBy(clientUsbStatus.machineId, clientMaster.pcName)
-      .orderBy(desc(count()));
+      .orderBy(sql`COUNT(*) DESC`);
 
     const byMachine = byMachineRaw.map(r => ({
       machineId: r.machineId,
@@ -1032,15 +1038,18 @@ class DatabaseStorage implements IStorage {
     }));
 
     // Events by device
-    const byDeviceRaw = await db
+    let byDeviceQuery = db
       .select({
         deviceName: clientUsbStatus.deviceName,
         eventCount: count()
       })
-      .from(clientUsbStatus)
-      .where(whereClause)
+      .from(clientUsbStatus);
+    if (whereClause) {
+      byDeviceQuery = byDeviceQuery.where(whereClause);
+    }
+    const byDeviceRaw = await byDeviceQuery
       .groupBy(clientUsbStatus.deviceName)
-      .orderBy(desc(count()))
+      .orderBy(sql`COUNT(*) DESC`)
       .limit(20);
 
     const byDevice = byDeviceRaw.map(r => ({
@@ -1049,13 +1058,16 @@ class DatabaseStorage implements IStorage {
     }));
 
     // Events by date (last 30 days)
-    const byDateRaw = await db
+    let byDateQuery = db
       .select({
         date: sql<string>`DATE(${clientUsbStatus.createdAt})`,
         eventCount: count()
       })
-      .from(clientUsbStatus)
-      .where(whereClause)
+      .from(clientUsbStatus);
+    if (whereClause) {
+      byDateQuery = byDateQuery.where(whereClause);
+    }
+    const byDateRaw = await byDateQuery
       .groupBy(sql`DATE(${clientUsbStatus.createdAt})`)
       .orderBy(sql`DATE(${clientUsbStatus.createdAt})`);
 

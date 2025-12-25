@@ -87,6 +87,7 @@ export interface UrlEntry {
 export interface DeviceEntry {
   id: number;
   machineId: number | null;
+  profileId: number | null;
   pcName: string | null;
   deviceName: string;
   description: string | null;

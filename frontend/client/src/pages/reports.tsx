@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { api, DevicesByMachineReport, UsbActivityReport, SystemHealthReport, DeviceAnalyticsReport } from "@/lib/api";
+import { api, DevicesByMachineReport, SystemHealthReport, DeviceAnalyticsReport } from "@/lib/api";
 import Layout from "@/components/Layout";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -35,10 +35,6 @@ export default function ReportsPage() {
     queryFn: api.getDevicesByMachineReport
   });
 
-  const { data: usbReport, isLoading: loadingUsb, refetch: refetchUsb } = useQuery({
-    queryKey: ['reports', 'usb-activity'],
-    queryFn: () => api.getUsbActivityReport()
-  });
 
   const { data: healthReport, isLoading: loadingHealth, refetch: refetchHealth } = useQuery({
     queryKey: ['reports', 'system-health'],
@@ -216,17 +212,6 @@ export default function ReportsPage() {
               </div>
             </CardContent>
           </Card>
-          <Card className="border-l-4 border-l-cyan-500 hover:shadow-md transition-shadow">
-            <CardContent className="pt-4">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-xs text-muted-foreground">USB Events</p>
-                  <p className="text-2xl font-bold text-cyan-600">{usbReport?.totalEvents || 0}</p>
-                </div>
-                <Activity className="h-6 w-6 text-cyan-500 opacity-60" />
-              </div>
-            </CardContent>
-          </Card>
           <Card className="border-l-4 border-l-rose-500 hover:shadow-md transition-shadow">
             <CardContent className="pt-4">
               <div className="flex items-center justify-between">
@@ -253,10 +238,6 @@ export default function ReportsPage() {
             <TabsTrigger value="analytics" className="gap-2">
               <BarChart3 className="h-4 w-4" />
               Analytics
-            </TabsTrigger>
-            <TabsTrigger value="usb" className="gap-2">
-              <Usb className="h-4 w-4" />
-              USB Activity
             </TabsTrigger>
             <TabsTrigger value="health" className="gap-2">
               <Activity className="h-4 w-4" />
@@ -535,7 +516,7 @@ export default function ReportsPage() {
                                   <div className="flex items-center justify-between">
                                     <div>
                                       <p className="text-xs text-muted-foreground">Manufacturers</p>
-                                      <p className="text-2xl font-bold text-blue-600">{machineDeviceReport.summary.manufacturers.length}</p>
+                                      <p className="text-2xl font-bold text-blue-600">{machineDeviceReport.summary.byManufacturer?.length || 0}</p>
                                     </div>
                                     <Building2 className="h-6 w-6 text-blue-500 opacity-60" />
                                   </div>
@@ -544,7 +525,7 @@ export default function ReportsPage() {
                             </div>
 
                             {/* Manufacturer Breakdown */}
-                            {machineDeviceReport.summary.manufacturers.length > 0 && (
+                            {machineDeviceReport.summary.byManufacturer && machineDeviceReport.summary.byManufacturer.length > 0 && (
                               <Card>
                                 <CardHeader>
                                   <CardTitle className="text-lg flex items-center gap-2">
@@ -554,7 +535,7 @@ export default function ReportsPage() {
                                 </CardHeader>
                                 <CardContent>
                                   <div className="space-y-3">
-                                    {machineDeviceReport.summary.manufacturers.map((mfg, idx) => (
+                                    {machineDeviceReport.summary.byManufacturer.map((mfg, idx) => (
                                       <div key={idx} className="space-y-1">
                                         <div className="flex items-center justify-between text-sm">
                                           <span className="font-medium">{mfg.manufacturer || 'Unknown'}</span>
@@ -993,183 +974,6 @@ export default function ReportsPage() {
             )}
           </TabsContent>
 
-          {/* USB Activity Tab - Keep existing */}
-          <TabsContent value="usb" className="space-y-4 mt-4">
-            <div className="grid gap-4 md:grid-cols-2">
-              {/* Top Machines by USB Activity */}
-              <Card>
-                <CardHeader>
-                  <CardTitle className="text-lg flex items-center gap-2">
-                    <TrendingUp className="h-5 w-5" />
-                    Top Machines by Activity
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  {loadingUsb ? (
-                    <div className="flex items-center justify-center py-8">
-                      <Loader2 className="h-6 w-6 animate-spin" />
-                    </div>
-                  ) : (
-                    <div className="space-y-3">
-                      {usbReport?.byMachine.slice(0, 10).map((item, idx) => {
-                        const maxCount = usbReport.byMachine[0]?.eventCount || 1;
-                        const percentage = (item.eventCount / maxCount) * 100;
-                        return (
-                          <div key={item.machineId} className="space-y-1">
-                            <div className="flex justify-between text-sm">
-                              <span className="font-medium truncate max-w-[200px]">{item.pcName}</span>
-                              <span className="text-muted-foreground">{item.eventCount} events</span>
-                            </div>
-                            <Progress value={percentage} className="h-2" />
-                          </div>
-                        );
-                      })}
-                      {(!usbReport?.byMachine || usbReport.byMachine.length === 0) && (
-                        <p className="text-sm text-muted-foreground text-center py-4">No activity data</p>
-                      )}
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
-
-              {/* Top Devices Used */}
-              <Card>
-                <CardHeader>
-                  <CardTitle className="text-lg flex items-center gap-2">
-                    <HardDrive className="h-5 w-5" />
-                    Most Used Devices
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  {loadingUsb ? (
-                    <div className="flex items-center justify-center py-8">
-                      <Loader2 className="h-6 w-6 animate-spin" />
-                    </div>
-                  ) : (
-                    <div className="space-y-3">
-                      {usbReport?.byDevice.slice(0, 10).map((item, idx) => {
-                        const maxCount = usbReport.byDevice[0]?.eventCount || 1;
-                        const percentage = (item.eventCount / maxCount) * 100;
-                        return (
-                          <div key={item.deviceName} className="space-y-1">
-                            <div className="flex justify-between text-sm">
-                              <span className="font-medium truncate max-w-[200px]">{item.deviceName}</span>
-                              <span className="text-muted-foreground">{item.eventCount} uses</span>
-                            </div>
-                            <Progress value={percentage} className="h-2" />
-                          </div>
-                        );
-                      })}
-                      {(!usbReport?.byDevice || usbReport.byDevice.length === 0) && (
-                        <p className="text-sm text-muted-foreground text-center py-4">No device data</p>
-                      )}
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
-            </div>
-
-            {/* Activity Timeline */}
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Calendar className="h-5 w-5" />
-                  Activity Timeline (by date)
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                {loadingUsb ? (
-                  <div className="flex items-center justify-center py-8">
-                    <Loader2 className="h-6 w-6 animate-spin" />
-                  </div>
-                ) : usbReport?.byDate && usbReport.byDate.length > 0 ? (
-                  <div className="h-48 flex items-end gap-1">
-                    {usbReport.byDate.slice(-30).map((item, idx) => {
-                      const maxCount = Math.max(...usbReport.byDate.map(d => d.eventCount)) || 1;
-                      const heightPercent = (item.eventCount / maxCount) * 100;
-                      return (
-                        <div key={item.date} className="flex-1 group relative">
-                          <div 
-                            className="bg-primary/80 hover:bg-primary rounded-t transition-all"
-                            style={{ height: `${Math.max(heightPercent, 4)}%` }}
-                          />
-                          <div className="absolute bottom-full mb-1 left-1/2 -translate-x-1/2 opacity-0 group-hover:opacity-100 transition-opacity bg-popover text-popover-foreground text-xs px-2 py-1 rounded shadow-lg whitespace-nowrap z-10">
-                            {format(new Date(item.date), 'MMM d')}: {item.eventCount} events
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                ) : (
-                  <p className="text-sm text-muted-foreground text-center py-8">No timeline data available</p>
-                )}
-              </CardContent>
-            </Card>
-
-            {/* Recent Activity Table */}
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Activity className="h-5 w-5" />
-                  Recent USB Activity
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                {loadingUsb ? (
-                  <div className="flex items-center justify-center py-8">
-                    <Loader2 className="h-6 w-6 animate-spin" />
-                  </div>
-                ) : (
-                  <div className="rounded-md border overflow-auto max-h-[400px]">
-                    <Table>
-                      <TableHeader className="sticky top-0 bg-background">
-                        <TableRow>
-                          <TableHead>PC Name</TableHead>
-                          <TableHead>Device</TableHead>
-                          <TableHead>Port</TableHead>
-                          <TableHead>Connected</TableHead>
-                          <TableHead>Status</TableHead>
-                        </TableRow>
-                      </TableHeader>
-                      <TableBody>
-                        {usbReport?.recentActivity.slice(0, 50).map((log) => (
-                          <TableRow key={log.id}>
-                            <TableCell className="font-medium">{log.pcName}</TableCell>
-                            <TableCell>
-                              <div>
-                                <span>{log.deviceName}</span>
-                                {log.deviceManufacturer && (
-                                  <p className="text-xs text-muted-foreground">{log.deviceManufacturer}</p>
-                                )}
-                              </div>
-                            </TableCell>
-                            <TableCell>{log.devicePort || '-'}</TableCell>
-                            <TableCell className="text-sm">
-                              {log.connectTime 
-                                ? formatDistanceToNow(new Date(log.connectTime), { addSuffix: true })
-                                : '-'}
-                            </TableCell>
-                            <TableCell>
-                              <Badge variant={log.status === 'Connected' ? 'default' : 'secondary'}>
-                                {log.status}
-                              </Badge>
-                            </TableCell>
-                          </TableRow>
-                        ))}
-                        {(!usbReport?.recentActivity || usbReport.recentActivity.length === 0) && (
-                          <TableRow>
-                            <TableCell colSpan={5} className="text-center py-8 text-muted-foreground">
-                              No recent activity
-                            </TableCell>
-                          </TableRow>
-                        )}
-                      </TableBody>
-                    </Table>
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-          </TabsContent>
 
           {/* System Health Tab - Keep existing */}
           <TabsContent value="health" className="space-y-4 mt-4">

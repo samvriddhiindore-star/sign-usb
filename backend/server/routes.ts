@@ -1192,37 +1192,7 @@ export async function registerRoutes(
   });
 
   // USB Activity report
-  app.get("/api/reports/usb-activity", authMiddleware, async (req, res) => {
-    try {
-      console.log('[API] Fetching USB activity report...');
-      const startDate = req.query.startDate ? new Date(req.query.startDate as string) : undefined;
-      const endDate = req.query.endDate ? new Date(req.query.endDate as string) : undefined;
-      
-      const report = await storage.getUsbActivityReport(startDate, endDate);
-      console.log('[API] USB activity report fetched:', {
-        totalEvents: report.totalEvents,
-        byMachine: report.byMachine.length,
-        byDevice: report.byDevice.length
-      });
-      
-      // Serialize dates in recentActivity
-      const serializedReport = {
-        ...report,
-        recentActivity: report.recentActivity.map(log => ({
-          ...log,
-          connectTime: log.connectTime?.toISOString() || null,
-          disconnectTime: log.disconnectTime?.toISOString() || null,
-          createdAt: log.createdAt?.toISOString() || null
-        }))
-      };
-      
-      res.json(serializedReport);
-    } catch (error: any) {
-      console.error('[API] Error fetching USB activity report:', error);
-      console.error('[API] Error stack:', error.stack);
-      res.status(500).json({ error: error.message || 'Failed to fetch USB activity report' });
-    }
-  });
+  // USB Activity endpoint removed
 
   // System Health report
   app.get("/api/reports/system-health", authMiddleware, async (req, res) => {
@@ -1336,7 +1306,16 @@ export async function registerRoutes(
           createdAt: report.machine.createdAt?.toISOString() || null
         } : null,
         devices: report.devices.map(d => ({
-          ...d,
+          id: d.id,
+          deviceUid: d.deviceUid || null,
+          machineId: d.machineId,
+          profileId: d.profileId || null,
+          deviceName: d.deviceName,
+          description: d.description || null,
+          deviceId: d.deviceId,
+          deviceManufacturer: d.deviceManufacturer,
+          remark: d.remark,
+          isAllowed: d.isAllowed,
           createdAt: d.createdAt?.toISOString() || null,
           updatedAt: d.updatedAt?.toISOString() || null
         })),
