@@ -2,20 +2,43 @@ import { Link, useLocation } from "wouter";
 import { 
   LayoutDashboard, Monitor, Usb, Users, Globe, 
   ScrollText, Settings as SettingsIcon, LogOut, Menu,
-  Shield, UserCog, BarChart3, HelpCircle, ChevronDown, ChevronRight
+  Shield, UserCog, BarChart3, HelpCircle, ChevronDown, ChevronRight,
+  User, ChevronsUpDown
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useState, useEffect } from "react";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 
 export default function Layout({ children }: { children: React.ReactNode }) {
   const [location] = useLocation();
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const isHelpActive = location.startsWith('/help');
   const [helpMenuOpen, setHelpMenuOpen] = useState(isHelpActive);
+  
+  // Get user info from localStorage
+  const [userInfo, setUserInfo] = useState<{ name: string; email: string; role: string } | null>(null);
 
   useEffect(() => {
     if (isHelpActive) {
       setHelpMenuOpen(true);
+    }
+    
+    // Load user info from localStorage
+    const storedUser = localStorage.getItem('user');
+    if (storedUser) {
+      try {
+        setUserInfo(JSON.parse(storedUser));
+      } catch (e) {
+        console.error('Failed to parse user info:', e);
+      }
     }
   }, [isHelpActive]);
 
@@ -26,7 +49,6 @@ export default function Layout({ children }: { children: React.ReactNode }) {
     { href: "/reports", label: "Reports", icon: BarChart3 },
     { href: "/system-users", label: "System Users", icon: Users },
     { href: "/web-access-control", label: "Website Control", icon: Globe },
-    { href: "/users", label: "Portal Users", icon: UserCog },
   ];
 
   const helpMenuItems = [
@@ -46,6 +68,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
 
   const handleLogout = () => {
     localStorage.removeItem('token');
+    localStorage.removeItem('user');
     window.location.href = '/login';
   };
 
@@ -131,20 +154,6 @@ export default function Layout({ children }: { children: React.ReactNode }) {
           </div>
         </nav>
 
-        {/* User section */}
-        <div className="absolute bottom-0 w-full p-4 border-t border-sidebar-border space-y-2">
-          <div className="px-4 py-2 text-xs text-muted-foreground">
-            <p className="font-medium text-foreground">Administrator</p>
-            <p>admin@company.com</p>
-          </div>
-          <button 
-            onClick={handleLogout}
-            className="w-full flex items-center px-4 py-2.5 rounded-lg text-sm font-medium text-sidebar-foreground/70 hover:bg-destructive/10 hover:text-destructive transition-colors cursor-pointer"
-          >
-            <LogOut className="h-5 w-5 mr-3" />
-            Sign Out
-          </button>
-        </div>
       </aside>
 
       {/* Overlay for mobile sidebar */}
@@ -157,16 +166,65 @@ export default function Layout({ children }: { children: React.ReactNode }) {
 
       {/* Main Content */}
       <main className="flex-1 flex flex-col min-w-0 overflow-hidden">
-        {/* Top Header (Mobile Only mostly) */}
-        <header className="h-16 bg-card border-b border-border flex items-center justify-between px-6 lg:hidden">
-          <button onClick={() => setSidebarOpen(true)} className="p-2 -ml-2 text-muted-foreground">
+        {/* Top Header Bar */}
+        <header className="h-16 bg-card border-b border-border flex items-center justify-between px-4 md:px-6 sticky top-0 z-30">
+          {/* Left side - Mobile menu button */}
+          <button 
+            onClick={() => setSidebarOpen(true)} 
+            className="p-2 -ml-2 text-muted-foreground lg:hidden"
+          >
             <Menu className="h-6 w-6" />
           </button>
-          <div className="flex items-center gap-2">
+          
+          {/* Center - Logo (mobile only) */}
+          <div className="flex items-center gap-2 lg:hidden">
             <Shield className="h-5 w-5 text-primary" />
             <span className="font-semibold">SIGN - USB</span>
           </div>
-          <div className="w-6" />
+          
+          {/* Right side - User account dropdown */}
+          <div className="ml-auto">
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <button className="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-accent transition-colors">
+                  <Avatar className="h-8 w-8">
+                    <AvatarFallback className="bg-primary/10 text-primary">
+                      {userInfo?.name?.charAt(0).toUpperCase() || 'U'}
+                    </AvatarFallback>
+                  </Avatar>
+                  <div className="hidden md:block text-left">
+                    <p className="text-sm font-medium">{userInfo?.name || 'User'}</p>
+                    <p className="text-xs text-muted-foreground">{userInfo?.email || 'user@example.com'}</p>
+                  </div>
+                  <ChevronsUpDown className="h-4 w-4 text-muted-foreground hidden md:block" />
+                </button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-56">
+                <DropdownMenuLabel>
+                  <div className="flex flex-col space-y-1">
+                    <p className="text-sm font-medium">{userInfo?.name || 'User'}</p>
+                    <p className="text-xs text-muted-foreground">{userInfo?.email || 'user@example.com'}</p>
+                    <p className="text-xs text-muted-foreground capitalize">{userInfo?.role || 'user'}</p>
+                  </div>
+                </DropdownMenuLabel>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem asChild>
+                  <Link href="/settings" className="cursor-pointer">
+                    <SettingsIcon className="mr-2 h-4 w-4" />
+                    Settings
+                  </Link>
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem 
+                  onClick={handleLogout}
+                  className="cursor-pointer text-destructive focus:text-destructive"
+                >
+                  <LogOut className="mr-2 h-4 w-4" />
+                  Sign Out
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
         </header>
 
         <div className="flex-1 overflow-y-auto bg-secondary/30 p-4 md:p-8">

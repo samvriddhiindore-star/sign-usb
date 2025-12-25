@@ -1,9 +1,24 @@
+import { useState, useEffect } from "react";
+import { useLocation } from "wouter";
 import Layout from "@/components/Layout";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { Settings, SlidersHorizontal } from "lucide-react";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Settings, UserCog, SlidersHorizontal } from "lucide-react";
+import { PortalUsersContent } from "@/pages/users";
 
 export default function SettingsPage() {
+  const [location, setLocation] = useLocation();
+  const [activeTab, setActiveTab] = useState('general');
+
+  useEffect(() => {
+    // Check for tab query parameter
+    const params = new URLSearchParams(window.location.search);
+    const tab = params.get('tab');
+    if (tab === 'portal-users') {
+      setActiveTab('portal-users');
+    }
+  }, [location]);
+
   return (
     <Layout>
       <div className="space-y-6">
@@ -14,30 +29,40 @@ export default function SettingsPage() {
           <div>
             <h1 className="text-3xl font-bold tracking-tight">Settings</h1>
             <p className="text-muted-foreground mt-1">
-              Configure global preferences, notifications, and integrations.
+              Configure global preferences, notifications, and user management.
             </p>
           </div>
         </div>
 
-        <Alert>
-          <SlidersHorizontal className="h-4 w-4" />
-          <AlertTitle>Coming soon</AlertTitle>
-          <AlertDescription>
-            Add organization settings, notification channels, identity providers, and audit preferences here.
-          </AlertDescription>
-        </Alert>
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+          <TabsList className="grid w-full max-w-md grid-cols-2">
+            <TabsTrigger value="general">General</TabsTrigger>
+            <TabsTrigger value="portal-users">
+              <UserCog className="h-4 w-4 mr-2" />
+              Portal Users
+            </TabsTrigger>
+          </TabsList>
 
-        <Card>
-          <CardHeader>
-            <CardTitle>Suggested sections</CardTitle>
-            <CardDescription>Use this layout as a placeholder until backend hooks are ready.</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-2 text-sm text-muted-foreground">
-            <p>• Organization profile and branding.</p>
-            <p>• Auth providers (SSO/MFA) and password policies.</p>
-            <p>• Notification channels and webhook integrations.</p>
-          </CardContent>
-        </Card>
+          <TabsContent value="general" className="space-y-6 mt-6">
+            <Card>
+              <CardHeader>
+                <CardTitle>General Settings</CardTitle>
+                <CardDescription>Configure global preferences and system settings.</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="p-4 border rounded-lg">
+                  <p className="text-sm text-muted-foreground">
+                    General settings configuration will be available here.
+                  </p>
+                </div>
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          <TabsContent value="portal-users" className="mt-6">
+            <PortalUsersContent />
+          </TabsContent>
+        </Tabs>
       </div>
     </Layout>
   );

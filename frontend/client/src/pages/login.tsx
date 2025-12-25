@@ -42,6 +42,7 @@ export default function LoginPage() {
       
       const data = await response.json();
       localStorage.setItem('token', data.token);
+      localStorage.setItem('user', JSON.stringify(data.admin));
       setLocation("/dashboard");
     } catch (error) {
       form.setError("password", { message: "Invalid credentials" });

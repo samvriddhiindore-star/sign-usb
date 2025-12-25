@@ -36,7 +36,9 @@ function Router() {
       <Route path="/machines" component={MachinesPage} /> {/* legacy path */}
       <Route path="/machines/:id" component={MachineDetailPage} />
       <Route path="/system-users" component={SystemUsersPage} />
-      <Route path="/users" component={UsersPage} /> {/* legacy path */}
+      <Route path="/users">
+        <Redirect to="/settings" />
+      </Route>
       <Route path="/web-access-control" component={WebAccessControlPage} />
       <Route path="/reports" component={ReportsPage} />
       <Route path="/logs" component={LogsPage} />
