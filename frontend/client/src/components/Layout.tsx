@@ -2,8 +2,7 @@ import { Link, useLocation } from "wouter";
 import { 
   LayoutDashboard, Monitor, Usb, Users, Globe, 
   ScrollText, Settings as SettingsIcon, LogOut, Menu,
-  Shield, UserCog, BarChart3, HelpCircle, ChevronDown, ChevronRight,
-  User, ChevronsUpDown
+  Shield, UserCog, BarChart3, HelpCircle, ChevronDown, ChevronRight
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useState, useEffect } from "react";
@@ -74,12 +73,12 @@ export default function Layout({ children }: { children: React.ReactNode }) {
 
   return (
     <div className="min-h-screen bg-background flex">
-      {/* Sidebar */}
+      {/* Sidebar - Fixed */}
       <aside className={cn(
-        "fixed inset-y-0 left-0 z-50 w-64 bg-sidebar text-sidebar-foreground transform transition-transform duration-200 ease-in-out lg:translate-x-0 lg:static lg:inset-auto border-r border-sidebar-border",
+        "fixed inset-y-0 left-0 z-50 w-64 bg-sidebar text-sidebar-foreground transform transition-transform duration-200 ease-in-out lg:translate-x-0 border-r border-sidebar-border flex flex-col",
         sidebarOpen ? "translate-x-0" : "-translate-x-full"
       )}>
-        <div className="h-16 flex items-center px-6 border-b border-sidebar-border">
+        <div className="h-16 flex items-center px-6 border-b border-sidebar-border flex-shrink-0">
           <div className="h-9 w-9 rounded-lg bg-primary/10 flex items-center justify-center mr-3">
             <Shield className="h-5 w-5 text-primary" />
           </div>
@@ -89,7 +88,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
           </div>
         </div>
 
-        <nav className="p-4 space-y-1">
+        <nav className="flex-1 overflow-y-auto p-4 space-y-1">
           {navItems.map((item) => {
             const isActive = location === item.href || location.startsWith(item.href + '/');
             return (
@@ -165,9 +164,9 @@ export default function Layout({ children }: { children: React.ReactNode }) {
       )}
 
       {/* Main Content */}
-      <main className="flex-1 flex flex-col min-w-0 overflow-hidden">
-        {/* Top Header Bar */}
-        <header className="h-16 bg-card border-b border-border flex items-center justify-between px-4 md:px-6 sticky top-0 z-30">
+      <main className="flex-1 flex flex-col min-w-0 overflow-hidden lg:ml-64">
+        {/* Top Header Bar - Fixed */}
+        <header className="h-16 bg-card border-b border-border flex items-center justify-between px-4 md:px-6 fixed top-0 right-0 left-0 lg:left-64 z-30">
           {/* Left side - Mobile menu button */}
           <button 
             onClick={() => setSidebarOpen(true)} 
@@ -186,17 +185,12 @@ export default function Layout({ children }: { children: React.ReactNode }) {
           <div className="ml-auto">
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <button className="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-accent transition-colors">
-                  <Avatar className="h-8 w-8">
-                    <AvatarFallback className="bg-primary/10 text-primary">
+                <button className="flex items-center justify-center p-1 rounded-full hover:bg-accent transition-colors focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2">
+                  <Avatar className="h-9 w-9 cursor-pointer">
+                    <AvatarFallback className="bg-primary/10 text-primary font-semibold">
                       {userInfo?.name?.charAt(0).toUpperCase() || 'U'}
                     </AvatarFallback>
                   </Avatar>
-                  <div className="hidden md:block text-left">
-                    <p className="text-sm font-medium">{userInfo?.name || 'User'}</p>
-                    <p className="text-xs text-muted-foreground">{userInfo?.email || 'user@example.com'}</p>
-                  </div>
-                  <ChevronsUpDown className="h-4 w-4 text-muted-foreground hidden md:block" />
                 </button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" className="w-56">
@@ -227,7 +221,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
           </div>
         </header>
 
-        <div className="flex-1 overflow-y-auto bg-secondary/30 p-4 md:p-8">
+        <div className="flex-1 overflow-y-auto bg-secondary/30 p-4 md:p-8 mt-16">
           {children}
         </div>
       </main>
