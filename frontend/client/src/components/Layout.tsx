@@ -2,10 +2,14 @@ import { Link, useLocation } from "wouter";
 import { 
   LayoutDashboard, Monitor, Usb, Users, Globe, 
   ScrollText, Settings as SettingsIcon, LogOut, Menu,
-  Shield, UserCog, BarChart3, HelpCircle, ChevronDown, ChevronRight
+  Shield, UserCog, BarChart3, HelpCircle, ChevronDown, ChevronRight,
+  Bell, AlertTriangle
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useState, useEffect } from "react";
+import { useQuery } from "@tanstack/react-query";
+import { api } from "@/lib/api";
+import { Badge } from "@/components/ui/badge";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -15,6 +19,26 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+
+// Notification Badge Component
+function NotificationBadge() {
+  const { data: unreadCount } = useQuery({
+    queryKey: ['unread-count'],
+    queryFn: api.getUnreadNotificationCount,
+    refetchInterval: 30000, // Refetch every 30 seconds
+  });
+
+  if (!unreadCount || unreadCount === 0) return null;
+
+  return (
+    <Badge 
+      variant="destructive" 
+      className="absolute -top-1 -right-1 h-5 w-5 flex items-center justify-center p-0 text-xs font-bold"
+    >
+      {unreadCount > 99 ? '99+' : unreadCount}
+    </Badge>
+  );
+}
 
 export default function Layout({ children }: { children: React.ReactNode }) {
   const [location] = useLocation();
@@ -48,6 +72,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
     { href: "/reports", label: "Reports", icon: BarChart3 },
     { href: "/system-users", label: "System Users", icon: Users },
     { href: "/web-access-control", label: "Website Control", icon: Globe },
+    { href: "/duplicate-macids", label: "Duplicate MAC IDs", icon: AlertTriangle },
   ];
 
   const helpMenuItems = [
@@ -181,8 +206,17 @@ export default function Layout({ children }: { children: React.ReactNode }) {
             <span className="font-semibold">SIGN - USB</span>
           </div>
           
-          {/* Right side - User account dropdown */}
-          <div className="ml-auto">
+          {/* Right side - Notifications and User account */}
+          <div className="ml-auto flex items-center gap-3">
+            {/* Notifications Bell */}
+            <Link href="/notifications">
+              <button className="relative p-2 rounded-full hover:bg-accent transition-colors focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2">
+                <Bell className="h-5 w-5 text-muted-foreground" />
+                <NotificationBadge />
+              </button>
+            </Link>
+
+            {/* User account dropdown */}
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <button className="flex items-center justify-center p-1 rounded-full hover:bg-accent transition-colors focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2">

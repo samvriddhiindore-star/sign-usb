@@ -152,6 +152,20 @@ export interface SystemHealthReport {
   inactiveSystems: System[];
 }
 
+export interface SystemNotification {
+  id: number;
+  notificationUid: string | null;
+  machineId: number | null;
+  notificationType: string;
+  title: string;
+  message: string | null;
+  oldValue: string | null;
+  newValue: string | null;
+  macId: string | null;
+  isRead: number;
+  createdAt: string | null;
+}
+
 export interface DeviceAnalyticsReport {
   summary: {
     totalDevices: number;
@@ -849,5 +863,92 @@ export const api = {
 
   async getAllLogs(): Promise<any[]> {
     return this.getUsbLogs();
-  }
+  },
+
+  // ==================== NOTIFICATIONS ====================
+  async getNotifications(limit?: number, unreadOnly?: boolean): Promise<SystemNotification[]> {
+    const params = new URLSearchParams();
+    if (limit) params.append('limit', limit.toString());
+    if (unreadOnly) params.append('unreadOnly', 'true');
+    
+    const response = await fetch(`${API_BASE}/notifications?${params}`, {
+      headers: getAuthHeaders()
+    });
+    
+    if (!response.ok) {
+      throw new Error('Failed to fetch notifications');
+    }
+    
+    return response.json();
+  },
+
+  async getUnreadNotificationCount(): Promise<number> {
+    const response = await fetch(`${API_BASE}/notifications/unread-count`, {
+      headers: getAuthHeaders()
+    });
+    
+    if (!response.ok) {
+      throw new Error('Failed to fetch unread notification count');
+    }
+    
+    const data = await response.json();
+    return data.count;
+  },
+
+  async markNotificationAsRead(id: number): Promise<void> {
+    const response = await fetch(`${API_BASE}/notifications/${id}/read`, {
+      method: 'PUT',
+      headers: getAuthHeaders()
+    });
+    
+    if (!response.ok) {
+      throw new Error('Failed to mark notification as read');
+    }
+  },
+
+  async markAllNotificationsAsRead(): Promise<number> {
+    const response = await fetch(`${API_BASE}/notifications/read-all`, {
+      method: 'PUT',
+      headers: getAuthHeaders()
+    });
+    
+    if (!response.ok) {
+      throw new Error('Failed to mark all notifications as read');
+    }
+    
+    const data = await response.json();
+    return data.affected;
+  },
+
+  // ==================== DUPLICATE MAC ID MANAGEMENT ====================
+  async getDuplicateMacIds(): Promise<{ macId: string; count: number; systems: System[] }[]> {
+    console.log('[API] Fetching duplicate MAC IDs from:', `${API_BASE}/systems/duplicates`);
+    const response = await fetch(`${API_BASE}/systems/duplicates`, {
+      headers: getAuthHeaders()
+    });
+    
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error('[API] Failed to fetch duplicate MAC IDs:', response.status, errorText);
+      throw new Error(`Failed to fetch duplicate MAC IDs: ${response.status} ${errorText}`);
+    }
+    
+    const data = await response.json();
+    console.log('[API] Received duplicate MAC IDs:', data);
+    return data;
+  },
+
+  async mergeDuplicateMacId(macId: string, keepMachineId: number, mergeMachineIds: number[]): Promise<{ success: boolean; merged: number; message: string }> {
+    const response = await fetch(`${API_BASE}/systems/duplicates/merge`, {
+      method: 'POST',
+      headers: getAuthHeaders(),
+      body: JSON.stringify({ macId, keepMachineId, mergeMachineIds })
+    });
+    
+    if (!response.ok) {
+      throw new Error('Failed to merge duplicate MAC IDs');
+    }
+    
+    return response.json();
+  },
 };

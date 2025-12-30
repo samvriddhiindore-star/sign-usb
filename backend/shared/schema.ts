@@ -39,6 +39,7 @@ export const clientMaster = mysqlTable("client_master", {
   usbStatus: tinyint("usb_status").default(0), // 0 = disabled, 1 = enabled
   machineOn: tinyint("machine_on").default(0), // 0 = offline, 1 = online
   lastConnected: datetime("last_connected"),
+  timeOffset: int("time_offset"), // Time offset in milliseconds: server_time - client_time (stored in DB as server time)
   remark: varchar("remark", { length: 255 }),
   createdAt: timestamp("created_at", { mode: "date" }).default(sql`CURRENT_TIMESTAMP`),
   systemUserId: int("profile_id").references(() => systemUsers.systemUserId, { onDelete: "set null" }),
@@ -85,6 +86,21 @@ export const deviceMaster = mysqlTable("device_master", {
   updatedAt: timestamp("updated_at", { mode: "date" }).default(sql`CURRENT_TIMESTAMP`),
 });
 
+// System Notifications table - tracks PC name changes and other system events
+export const systemNotifications = mysqlTable("system_notifications", {
+  id: int("id").autoincrement().primaryKey(),
+  notificationUid: varchar("notification_uid", { length: 36 }), // UUID stored as char(36)
+  machineId: int("machine_id").references(() => clientMaster.machineId, { onDelete: "cascade" }),
+  notificationType: varchar("notification_type", { length: 50 }).notNull(), // 'pc_name_changed', 'system_registered', etc.
+  title: varchar("title", { length: 255 }).notNull(),
+  message: varchar("message", { length: 500 }),
+  oldValue: varchar("old_value", { length: 255 }), // Old PC name
+  newValue: varchar("new_value", { length: 255 }), // New PC name
+  macId: varchar("mac_id", { length: 255 }), // MAC ID for reference
+  isRead: tinyint("is_read").default(0), // 0 = unread, 1 = read
+  createdAt: timestamp("created_at", { mode: "date" }).default(sql`CURRENT_TIMESTAMP`),
+});
+
 // Insert Schemas
 export const insertAdminSchema = createInsertSchema(admins).omit({
   id: true,
@@ -124,6 +140,12 @@ export const insertDeviceMasterSchema = createInsertSchema(deviceMaster).omit({
   updatedAt: true,
 });
 
+export const insertSystemNotificationSchema = createInsertSchema(systemNotifications).omit({
+  id: true,
+  notificationUid: true, // Auto-generated, don't include in insert
+  createdAt: true,
+});
+
 // Select Types
 export type Admin = typeof admins.$inferSelect;
 export type ClientMaster = typeof clientMaster.$inferSelect;
@@ -131,6 +153,7 @@ export type ClientUsbStatus = typeof clientUsbStatus.$inferSelect;
 export type SystemUser = typeof systemUsers.$inferSelect;
 export type UrlMaster = typeof urlMaster.$inferSelect;
 export type DeviceMaster = typeof deviceMaster.$inferSelect;
+export type SystemNotification = typeof systemNotifications.$inferSelect;
 
 // Insert Types
 export type InsertAdmin = z.infer<typeof insertAdminSchema>;
@@ -139,6 +162,7 @@ export type InsertClientUsbStatus = z.infer<typeof insertClientUsbStatusSchema>;
 export type InsertSystemUser = z.infer<typeof insertSystemUserSchema>;
 export type InsertUrlMaster = z.infer<typeof insertUrlMasterSchema>;
 export type InsertDeviceMaster = z.infer<typeof insertDeviceMasterSchema>;
+export type InsertSystemNotification = z.infer<typeof insertSystemNotificationSchema>;
 
 // Extended types for API responses
 export type ClientWithSystemUser = ClientMaster & {

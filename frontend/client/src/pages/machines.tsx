@@ -58,6 +58,18 @@ export default function MachinesPage() {
     queryFn: api.getSystemUsers
   });
 
+  const { data: duplicates } = useQuery({
+    queryKey: ['duplicate-macids'],
+    queryFn: api.getDuplicateMacIds,
+    staleTime: 60000, // Cache for 1 minute
+  });
+
+  // Create a map of MAC IDs to duplicate count for quick lookup
+  const duplicateMacIdMap = new Map<string, number>();
+  duplicates?.forEach(dup => {
+    duplicateMacIdMap.set(dup.macId, dup.count);
+  });
+
   const updateUsbMutation = useMutation({
     mutationFn: ({ machineId, enabled }: { machineId: number; enabled: boolean }) =>
       api.updateSystemUsb(machineId, enabled),
@@ -194,10 +206,20 @@ export default function MachinesPage() {
             <h1 className="text-3xl font-bold tracking-tight">Systems</h1>
             <p className="text-muted-foreground mt-1">Manage and control all registered machines.</p>
           </div>
-          <Button onClick={() => refetch()} variant="outline" size="sm">
-            <RefreshCw className="h-4 w-4 mr-2" />
-            Refresh
-          </Button>
+          <div className="flex gap-2">
+            {duplicates && duplicates.length > 0 && (
+              <Link href="/duplicate-macids">
+                <Button variant="destructive" size="sm">
+                  <AlertTriangle className="h-4 w-4 mr-2" />
+                  {duplicates.length} Duplicate{duplicates.length > 1 ? 's' : ''}
+                </Button>
+              </Link>
+            )}
+            <Button onClick={() => refetch()} variant="outline" size="sm">
+              <RefreshCw className="h-4 w-4 mr-2" />
+              Refresh
+            </Button>
+          </div>
         </div>
 
         {/* Filters & Search */}
@@ -350,9 +372,23 @@ export default function MachinesPage() {
                           </div>
                         </TableCell>
                         <TableCell>
-                          <code className="text-xs bg-muted px-2 py-1 rounded">
-                            {system.macId}
-                          </code>
+                          <div className="flex items-center gap-2">
+                            <code className="text-xs bg-muted px-2 py-1 rounded">
+                              {system.macId}
+                            </code>
+                            {duplicateMacIdMap.has(system.macId) && duplicateMacIdMap.get(system.macId)! > 1 && (
+                              <Link href="/duplicate-macids">
+                                <Badge 
+                                  variant="destructive" 
+                                  className="cursor-pointer hover:bg-destructive/90 text-xs"
+                                  title={`${duplicateMacIdMap.get(system.macId)} systems share this MAC ID`}
+                                >
+                                  <AlertTriangle className="h-3 w-3 mr-1" />
+                                  Duplicate
+                                </Badge>
+                              </Link>
+                            )}
+                          </div>
                         </TableCell>
                         <TableCell>
                           {system.systemUser ? (

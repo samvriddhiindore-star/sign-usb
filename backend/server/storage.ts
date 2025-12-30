@@ -7,6 +7,7 @@ import {
   urlMaster,
   deviceMaster,
   admins,
+  systemNotifications,
   type ClientMaster,
   type ClientUsbStatus,
   type SystemUser,
@@ -19,6 +20,8 @@ import {
   type InsertUrlMaster,
   type InsertDeviceMaster,
   type InsertAdmin,
+  type InsertSystemNotification,
+  type SystemNotification,
   type DashboardStats,
   type ClientWithSystemUser,
   type SystemUserWithMachines,
@@ -112,42 +115,107 @@ export interface IStorage {
   
   // Dashboard Stats
   getDashboardStats(): Promise<DashboardStats>;
+  
+  // System Registration (with MAC ID matching and PC name change detection)
+  registerOrUpdateSystemByMacId(pcName: string, macId: string, clientTime?: string, systemUserId?: number | null): Promise<{ system: ClientMaster; wasUpdated: boolean; pcNameChanged: boolean; oldPcName?: string; duplicateDetected?: boolean; duplicateSystems?: ClientMaster[] }>;
+  
+  // System Notifications
+  createNotification(notification: InsertSystemNotification): Promise<SystemNotification>;
+  getNotifications(limit?: number, unreadOnly?: boolean): Promise<SystemNotification[]>;
+  markNotificationAsRead(id: number): Promise<SystemNotification | undefined>;
+  markAllNotificationsAsRead(): Promise<number>;
+  getUnreadNotificationCount(): Promise<number>;
 }
 
 class DatabaseStorage implements IStorage {
   // ==================== HELPER METHODS ====================
   /**
-   * Check if a system is online based on last_connected time
-   * System is considered offline if last_connected is more than 1 minute old
+   * Get the current database server time
+   * This ensures we use the database server's clock, not the application server's clock
    */
-  private isSystemOnline(machineOn: number | null, lastConnected: Date | null): boolean {
+  private async getDatabaseServerTime(): Promise<Date> {
+    const result = await db.execute(sql`SELECT NOW() as db_time`);
+    const dbTime = (result as any)[0]?.db_time;
+    if (!dbTime) {
+      // Fallback to application server time if DB query fails
+      console.warn('[WARNING] Failed to get database server time, using application server time');
+      return new Date();
+    }
+    return new Date(dbTime);
+  }
+
+  /**
+   * Check if a system is online based on last_connected time
+   * System is considered offline if last_connected is more than 30 seconds old (using client time)
+   * 
+   * Time Adjustment Logic (using DATABASE SERVER TIME):
+   * 1. Calculate time difference: timeOffset = db_server_time - client_time (stored in DB)
+   *    Example: DB Server = 2 PM, Client = 12 PM → timeOffset = +2 hours = +7200000 ms
+   * 
+   * 2. When checking online status:
+   *    - Get current DATABASE server time (e.g., 2:00:30 PM)
+   *    - Adjust to client time: client_current = db_server_time - timeOffset (e.g., 12:00:30 PM)
+   *    - Get last_connected (stored as database server time, e.g., 2:00:00 PM)
+   *    - Adjust to client time: client_last_connected = stored_db_server_time - timeOffset (e.g., 12:00:00 PM)
+   *    - Compare in client time: difference = 12:00:30 PM - 12:00:00 PM = 30 seconds
+   * 
+   * 3. If difference in client time <= 30 seconds → Online, else → Offline
+   */
+  async isSystemOnline(machineOn: number | null, lastConnected: Date | null, timeOffset: number | null): Promise<boolean> {
     // If machineOn is explicitly 0, system is offline
     if (machineOn === 0) return false;
     
     // If lastConnected is null or undefined, system is offline
     if (!lastConnected) return false;
     
-    const now = new Date();
-    const lastConnectedTime = new Date(lastConnected);
+    // Get current DATABASE server time (not application server time)
+    const dbServerNow = await this.getDatabaseServerTime();
+    
+    // Convert lastConnected to Date if it's not already
+    const lastConnectedDbServerTime = lastConnected instanceof Date ? lastConnected : new Date(lastConnected);
     
     // Handle invalid dates
-    if (isNaN(lastConnectedTime.getTime())) {
-      console.warn(`[isSystemOnline] Invalid lastConnected date: ${lastConnected}`);
+    if (isNaN(lastConnectedDbServerTime.getTime())) {
       return false;
     }
     
-    const diffInMs = now.getTime() - lastConnectedTime.getTime();
-    const diffInMinutes = diffInMs / (1000 * 60);
-    
-    // If last connected is more than 1 minute ago, consider offline
-    // Also handle negative differences (future dates) as offline
-    if (diffInMinutes < 0) {
-      console.warn(`[isSystemOnline] Future date detected: ${lastConnected}, diff: ${diffInMinutes.toFixed(2)} minutes`);
-      return false;
+    // If timeOffset is not available, fall back to simple database server time check (30 seconds)
+    if (timeOffset === null || timeOffset === undefined) {
+      const diffInMs = dbServerNow.getTime() - lastConnectedDbServerTime.getTime();
+      const diffInSeconds = diffInMs / 1000;
+      return diffInSeconds >= 0 && diffInSeconds <= 30;
     }
     
-    const isOnline = diffInMinutes <= 1;
-    return isOnline;
+    // TIME ADJUSTMENT LOGIC (using DATABASE SERVER TIME):
+    // Step 1: Calculate client's current time by adjusting database server time
+    // client_time = db_server_time - time_offset
+    const clientNow = new Date(dbServerNow.getTime() - timeOffset);
+    
+    // Step 2: Calculate client's last connected time by adjusting stored database server time
+    // client_last_connected = stored_db_server_time - time_offset
+    const lastConnectedClientTime = new Date(lastConnectedDbServerTime.getTime() - timeOffset);
+    
+    // Step 3: Compare in client time domain
+    const diffInMs = clientNow.getTime() - lastConnectedClientTime.getTime();
+    const diffInSeconds = diffInMs / 1000;
+    
+    // Debug logging (can be removed in production)
+    if (process.env.NODE_ENV === 'development') {
+      const offsetHours = (timeOffset / (1000 * 60 * 60)).toFixed(2);
+      console.log(`[TIME ADJUSTMENT] Machine check (using DB server time):`, {
+        dbServerTime: dbServerNow.toISOString(),
+        clientTime: clientNow.toISOString(),
+        lastConnectedDbServer: lastConnectedDbServerTime.toISOString(),
+        lastConnectedClient: lastConnectedClientTime.toISOString(),
+        timeOffsetHours: `${offsetHours} hours`,
+        diffInSeconds: diffInSeconds.toFixed(2),
+        isOnline: diffInSeconds >= 0 && diffInSeconds <= 30
+      });
+    }
+    
+    // System is online if difference in client time is within 30 seconds
+    // If difference is negative (future date) or more than 30 seconds, system is offline
+    return diffInSeconds >= 0 && diffInSeconds <= 30;
   }
 
   // ==================== ADMIN METHODS ====================
@@ -214,6 +282,7 @@ class DatabaseStorage implements IStorage {
         usbStatus: clientMaster.usbStatus,
         machineOn: clientMaster.machineOn,
         lastConnected: clientMaster.lastConnected,
+        timeOffset: clientMaster.timeOffset,
         remark: clientMaster.remark,
         createdAt: clientMaster.createdAt,
         systemUserId: clientMaster.systemUserId,
@@ -230,6 +299,7 @@ class DatabaseStorage implements IStorage {
       usbStatus: row.usbStatus,
       machineOn: row.machineOn,
       lastConnected: row.lastConnected,
+      timeOffset: row.timeOffset,
       remark: row.remark,
       createdAt: row.createdAt,
       systemUserId: row.systemUserId,
@@ -246,6 +316,7 @@ class DatabaseStorage implements IStorage {
         usbStatus: clientMaster.usbStatus,
         machineOn: clientMaster.machineOn,
         lastConnected: clientMaster.lastConnected,
+        timeOffset: clientMaster.timeOffset,
         remark: clientMaster.remark,
         createdAt: clientMaster.createdAt,
         systemUserId: clientMaster.systemUserId,
@@ -266,6 +337,7 @@ class DatabaseStorage implements IStorage {
       usbStatus: row.usbStatus,
       machineOn: row.machineOn,
       lastConnected: row.lastConnected,
+      timeOffset: row.timeOffset,
       remark: row.remark,
       createdAt: row.createdAt,
       systemUserId: row.systemUserId,
@@ -276,6 +348,115 @@ class DatabaseStorage implements IStorage {
   async getSystemByMacId(macId: string): Promise<ClientMaster | undefined> {
     const result = await db.select().from(clientMaster).where(eq(clientMaster.macId, macId)).limit(1);
     return result[0];
+  }
+
+  async getSystemsByMacId(macId: string): Promise<ClientMaster[]> {
+    return await db.select().from(clientMaster).where(eq(clientMaster.macId, macId));
+  }
+
+  async getDuplicateMacIds(): Promise<{ macId: string; count: number; systems: ClientMaster[] }[]> {
+    try {
+      // Get all systems and group by MAC ID in JavaScript (more reliable than SQL GROUP BY)
+      const allSystems = await db.select().from(clientMaster);
+      
+      // Group by MAC ID
+      const macIdMap = new Map<string, ClientMaster[]>();
+      
+      allSystems.forEach(system => {
+        const macId = system.macId?.trim() || '';
+        if (macId) {
+          if (!macIdMap.has(macId)) {
+            macIdMap.set(macId, []);
+          }
+          macIdMap.get(macId)!.push(system);
+        }
+      });
+
+      // Find duplicates (MAC IDs with more than 1 system)
+      const duplicates: { macId: string; count: number; systems: ClientMaster[] }[] = [];
+
+      macIdMap.forEach((systems, macId) => {
+        if (systems.length > 1) {
+          duplicates.push({
+            macId: macId,
+            count: systems.length,
+            systems
+          });
+        }
+      });
+
+      // Sort by count (descending)
+      duplicates.sort((a, b) => b.count - a.count);
+
+      console.log(`[DUPLICATE MAC IDS] Found ${duplicates.length} duplicate MAC ID groups`);
+      duplicates.forEach(dup => {
+        console.log(`[DUPLICATE MAC IDS] MAC ID: "${dup.macId}" has ${dup.count} systems`);
+      });
+
+      return duplicates;
+    } catch (error: any) {
+      console.error(`[DUPLICATE MAC IDS ERROR]`, error);
+      throw error;
+    }
+  }
+
+  async mergeDuplicateMacId(macId: string, keepMachineId: number, mergeMachineIds: number[]): Promise<{ success: boolean; merged: number; message: string }> {
+    // Verify all systems have the same MAC ID
+    const allSystems = await this.getSystemsByMacId(macId);
+    const allIds = [keepMachineId, ...mergeMachineIds];
+    
+    if (!allSystems.some(s => s.machineId === keepMachineId)) {
+      throw new Error(`System with machineId ${keepMachineId} not found for MAC ID ${macId}`);
+    }
+
+    for (const mergeId of mergeMachineIds) {
+      if (!allSystems.some(s => s.machineId === mergeId)) {
+        throw new Error(`System with machineId ${mergeId} not found for MAC ID ${macId}`);
+      }
+    }
+
+    // Get the system to keep
+    const keepSystem = allSystems.find(s => s.machineId === keepMachineId);
+    if (!keepSystem) {
+      throw new Error(`System to keep not found`);
+    }
+
+    // Merge logic:
+    // 1. Transfer devices from merged systems to the kept system
+    // 2. Transfer USB logs references
+    // 3. Delete the merged systems
+
+    let mergedCount = 0;
+
+    for (const mergeId of mergeMachineIds) {
+      const mergeSystem = allSystems.find(s => s.machineId === mergeId);
+      if (!mergeSystem) continue;
+
+      // Update devices to point to the kept system
+      await db.update(deviceMaster)
+        .set({ machineId: keepMachineId })
+        .where(eq(deviceMaster.machineId, mergeId));
+
+      // Update USB logs to point to the kept system
+      await db.update(clientUsbStatus)
+        .set({ machineId: keepMachineId })
+        .where(eq(clientUsbStatus.machineId, mergeId));
+
+      // Update notifications to point to the kept system
+      await db.update(systemNotifications)
+        .set({ machineId: keepMachineId })
+        .where(eq(systemNotifications.machineId, mergeId));
+
+      // Delete the merged system
+      await this.deleteSystem(mergeId);
+      mergedCount++;
+    }
+
+    return {
+      success: true,
+      merged: mergedCount,
+      message: `Successfully merged ${mergedCount} system(s) into system ${keepMachineId} (${keepSystem.pcName})`
+    };
   }
 
   async createSystem(system: InsertClientMaster): Promise<ClientMaster> {
@@ -430,9 +611,11 @@ class DatabaseStorage implements IStorage {
   }
 
   async getConnectedUsbDevices(): Promise<(ClientUsbStatus & { pcName?: string })[]> {
+    // Get all devices that don't have a disconnect time
     const result = await db
       .select({
         id: clientUsbStatus.id,
+        logUid: clientUsbStatus.logUid,
         machineId: clientUsbStatus.machineId,
         deviceName: clientUsbStatus.deviceName,
         deviceDescription: clientUsbStatus.deviceDescription,
@@ -443,14 +626,32 @@ class DatabaseStorage implements IStorage {
         deviceRemark: clientUsbStatus.deviceRemark,
         createdAt: clientUsbStatus.createdAt,
         deviceId: clientUsbStatus.deviceId,
+        // Include system information to check online status
         pcName: clientMaster.pcName,
+        machineOn: clientMaster.machineOn,
+        lastConnected: clientMaster.lastConnected,
+        timeOffset: clientMaster.timeOffset,
       })
       .from(clientUsbStatus)
       .leftJoin(clientMaster, eq(clientUsbStatus.machineId, clientMaster.machineId))
       .where(isNull(clientUsbStatus.deviceDisconnectTime))
       .orderBy(desc(clientUsbStatus.deviceConnectTime));
     
-    return result as (ClientUsbStatus & { pcName?: string })[];
+    // Filter out devices from offline systems
+    // A device can only be "connected" if its system is online
+    const connectedDevices = await Promise.all(
+      result.map(async (device) => {
+        const isSystemOnline = await this.isSystemOnline(
+          device.machineOn ?? null,
+          device.lastConnected ?? null,
+          device.timeOffset ?? null
+        );
+        return isSystemOnline ? device : null;
+      })
+    );
+    
+    // Filter out null values (devices from offline systems)
+    return connectedDevices.filter((d): d is ClientUsbStatus & { pcName?: string } => d !== null);
   }
 
   async createUsbLog(log: InsertClientUsbStatus): Promise<ClientUsbStatus> {
@@ -792,7 +993,7 @@ class DatabaseStorage implements IStorage {
   }
 
   // ==================== REPORTS ====================
-  async getDevicesByMachineReport(): Promise<{ machineId: number; pcName: string; macId: string; machineOn: number; lastConnected: Date | null; totalDevices: number; allowedDevices: number; blockedDevices: number; devices: DeviceMasterWithDescription[] }[]> {
+  async getDevicesByMachineReport(): Promise<{ machineId: number; pcName: string; macId: string; machineOn: number; lastConnected: Date | null; timeOffset: number | null; totalDevices: number; allowedDevices: number; blockedDevices: number; devices: DeviceMasterWithDescription[] }[]> {
     const machines = await db.select().from(clientMaster).orderBy(desc(clientMaster.lastConnected));
     
     const report = await Promise.all(
@@ -804,6 +1005,7 @@ class DatabaseStorage implements IStorage {
           macId: machine.macId,
           machineOn: machine.machineOn ?? 0,
           lastConnected: machine.lastConnected,
+          timeOffset: machine.timeOffset,
           totalDevices: devices.length,
           allowedDevices: devices.filter(d => d.isAllowed === 1).length,
           blockedDevices: devices.filter(d => d.isAllowed === 0).length,
@@ -872,7 +1074,7 @@ class DatabaseStorage implements IStorage {
         const lastDeviceAdded = devices.length > 0 
           ? devices.sort((a, b) => (b.createdAt?.getTime() || 0) - (a.createdAt?.getTime() || 0))[0].createdAt
           : null;
-        const isOnline = this.isSystemOnline(machine.machineOn, machine.lastConnected);
+        const isOnline = await this.isSystemOnline(machine.machineOn, machine.lastConnected, machine.timeOffset);
         return {
           machineId: machine.machineId,
           pcName: machine.pcName,
@@ -887,10 +1089,18 @@ class DatabaseStorage implements IStorage {
     ).then(results => results.filter(m => m.totalDevices > 0).sort((a, b) => b.totalDevices - a.totalDevices));
 
     // Offline systems with devices
+    // Check online status for all machines first
+    const machineStatuses = await Promise.all(
+      machines.map(async (machine) => ({
+        machine,
+        isOnline: await this.isSystemOnline(machine.machineOn, machine.lastConnected, machine.timeOffset)
+      }))
+    );
+    
     const offlineSystems = await Promise.all(
-      machines
-        .filter(machine => !this.isSystemOnline(machine.machineOn, machine.lastConnected))
-        .map(async (machine) => {
+      machineStatuses
+        .filter(({ isOnline }) => !isOnline)
+        .map(async ({ machine }) => {
           const devices = await this.getDevicesByMachine(machine.machineId);
           return {
             machineId: machine.machineId,
@@ -1102,16 +1312,18 @@ class DatabaseStorage implements IStorage {
     const totalResult = await db.select({ count: count() }).from(clientMaster);
     const totalSystems = totalResult[0]?.count || 0;
 
-    // Get all systems to check online/offline based on last_connected time (1 minute rule)
+    // Get all systems to check online/offline based on last_connected time (30 second rule using client time)
     const allSystems = await db.select({
       machineOn: clientMaster.machineOn,
       lastConnected: clientMaster.lastConnected,
+      timeOffset: clientMaster.timeOffset,
     }).from(clientMaster);
 
-    // Count online systems: machineOn = 1 AND last_connected within 1 minute
-    const onlineSystems = allSystems.filter(s => 
-      this.isSystemOnline(s.machineOn, s.lastConnected)
-    ).length;
+    // Count online systems: machineOn = 1 AND last_connected within 30 seconds (using client time)
+    const systemStatuses = await Promise.all(
+      allSystems.map(s => this.isSystemOnline(s.machineOn, s.lastConnected, s.timeOffset))
+    );
+    const onlineSystems = systemStatuses.filter(isOnline => isOnline).length;
 
     const offlineSystems = totalSystems - onlineSystems;
 
@@ -1176,31 +1388,36 @@ class DatabaseStorage implements IStorage {
     const totalResult = await db.select({ count: count() }).from(clientMaster);
     const totalSystems = totalResult[0]?.count || 0;
 
-    // Get all systems to check online/offline based on last_connected time (1 minute rule)
+    // Get all systems to check online/offline based on last_connected time (30 second rule using client time)
     const allSystems = await db.select({
       machineOn: clientMaster.machineOn,
       lastConnected: clientMaster.lastConnected,
+      timeOffset: clientMaster.timeOffset,
     }).from(clientMaster);
 
-    // Count online systems: machineOn = 1 AND last_connected within 1 minute
-    const onlineSystems = allSystems.filter(s => {
-      const isOnline = this.isSystemOnline(s.machineOn, s.lastConnected);
-      
-      // Debug logging
-      if (!isOnline && s.machineOn === 1) {
-        const now = new Date();
-        const lastConnectedTime = s.lastConnected ? new Date(s.lastConnected) : null;
-        const diffInMs = lastConnectedTime ? now.getTime() - lastConnectedTime.getTime() : null;
-        const diffInMinutes = diffInMs ? diffInMs / (1000 * 60) : null;
-        console.log(`[DASHBOARD DEBUG] System marked offline:`, {
-          machineOn: s.machineOn,
-          lastConnected: s.lastConnected?.toISOString(),
-          diffInMinutes: diffInMinutes?.toFixed(2)
-        });
-      }
-      
-      return isOnline;
-    }).length;
+    // Count online systems: machineOn = 1 AND last_connected within 30 seconds (using client time)
+    const systemStatuses = await Promise.all(
+      allSystems.map(async (s) => {
+        const isOnline = await this.isSystemOnline(s.machineOn, s.lastConnected, s.timeOffset);
+        
+        // Debug logging (using database server time)
+        if (!isOnline && s.machineOn === 1) {
+          const dbServerNow = await this.getDatabaseServerTime();
+          const lastConnectedTime = s.lastConnected ? new Date(s.lastConnected) : null;
+          const diffInMs = lastConnectedTime ? dbServerNow.getTime() - lastConnectedTime.getTime() : null;
+          const diffInSeconds = diffInMs ? diffInMs / 1000 : null;
+          console.log(`[DASHBOARD DEBUG] System marked offline (DB server time):`, {
+            machineOn: s.machineOn,
+            lastConnected: s.lastConnected?.toISOString(),
+            dbServerTime: dbServerNow.toISOString(),
+            diffInSeconds: diffInSeconds?.toFixed(2)
+          });
+        }
+        
+        return isOnline;
+      })
+    );
+    const onlineSystems = systemStatuses.filter(isOnline => isOnline).length;
 
     // Offline systems
     const offlineSystems = totalSystems - onlineSystems;
@@ -1245,6 +1462,190 @@ class DatabaseStorage implements IStorage {
       usbEventsToday,
       usbEventsLast7Days
     };
+  }
+
+  // ==================== SYSTEM REGISTRATION ====================
+  /**
+   * Register or update a system by MAC ID
+   * If a system with the same MAC ID exists, update it (especially if PC name changed)
+   * If no system exists, create a new one
+   * Returns information about whether the system was updated and if PC name changed
+   * 
+   * IMPORTANT: 
+   * - Uses DATABASE SERVER time for lastConnected (stored in DB)
+   * - Calculates and stores time offset (db_server_time - client_time) for accurate online/offline detection
+   */
+  async registerOrUpdateSystemByMacId(pcName: string, macId: string, clientTime?: string, systemUserId?: number | null): Promise<{ system: ClientMaster; wasUpdated: boolean; pcNameChanged: boolean; oldPcName?: string; duplicateDetected?: boolean; duplicateSystems?: ClientMaster[] }> {
+    // Check for duplicate MAC IDs
+    const allSystemsWithMacId = await this.getSystemsByMacId(macId);
+    const existingSystem = allSystemsWithMacId.length > 0 ? allSystemsWithMacId[0] : undefined;
+    
+    // If there are multiple systems with the same MAC ID, log a warning
+    if (allSystemsWithMacId.length > 1) {
+      console.warn(`[DUPLICATE MAC ID DETECTED] MAC ID ${macId} has ${allSystemsWithMacId.length} systems:`, 
+        allSystemsWithMacId.map(s => ({ machineId: s.machineId, pcName: s.pcName, systemUserId: s.systemUserId }))
+      );
+    }
+    
+    // Get DATABASE SERVER time (not application server time)
+    const dbServerTime = await this.getDatabaseServerTime();
+    
+    // Calculate time offset if client time is provided
+    // TIME DIFFERENCE CALCULATION (using DATABASE SERVER TIME):
+    // timeOffset = db_server_time - client_time (in milliseconds)
+    // Example: DB Server = 2:00 PM, Client = 12:00 PM → timeOffset = +2 hours = +7200000 ms
+    // This offset is stored in the database and used to adjust timestamps for comparison
+    let timeOffset: number | null = null;
+    if (clientTime) {
+      try {
+        const clientTimeDate = new Date(clientTime);
+        if (!isNaN(clientTimeDate.getTime())) {
+          // Calculate the difference: db_server_time - client_time
+          timeOffset = dbServerTime.getTime() - clientTimeDate.getTime();
+          
+          // Log the time difference calculation for debugging
+          const offsetHours = (timeOffset / (1000 * 60 * 60)).toFixed(2);
+          const offsetMinutes = (timeOffset / (1000 * 60)).toFixed(2);
+          console.log(`[TIME OFFSET CALCULATION] System: ${pcName} (${macId})`, {
+            dbServerTime: dbServerTime.toISOString(),
+            clientTime: clientTimeDate.toISOString(),
+            timeOffsetMs: timeOffset,
+            timeOffsetHours: `${offsetHours} hours`,
+            timeOffsetMinutes: `${offsetMinutes} minutes`,
+            note: timeOffset > 0 ? 'DB Server is ahead' : timeOffset < 0 ? 'Client is ahead' : 'Times are synchronized'
+          });
+        }
+      } catch (e) {
+        console.warn(`[registerOrUpdateSystemByMacId] Invalid client time: ${clientTime}`);
+      }
+    }
+    
+    if (existingSystem) {
+      // System exists - check if PC name changed
+      const pcNameChanged = existingSystem.pcName !== pcName;
+      const oldPcName = pcNameChanged ? existingSystem.pcName : undefined;
+      
+      // If systemUserId is provided and different, update it
+      const updates: any = {
+        pcName,
+        machineOn: 1,
+        lastConnected: dbServerTime, // DATABASE SERVER time
+        timeOffset: timeOffset !== null ? timeOffset : existingSystem.timeOffset // Keep existing offset if new one is null
+      };
+      
+      // Update systemUserId if provided
+      if (systemUserId !== undefined) {
+        updates.systemUserId = systemUserId;
+      }
+      
+      // Update the system with new PC name and mark as online
+      // Store DATABASE SERVER time in lastConnected, and time offset for client time calculations
+      const updated = await this.updateSystem(existingSystem.machineId, updates);
+      
+      if (!updated) {
+        throw new Error("Failed to update system");
+      }
+      
+      // Create notification if PC name changed
+      if (pcNameChanged) {
+        await this.createNotification({
+          machineId: existingSystem.machineId,
+          notificationType: 'pc_name_changed',
+          title: 'PC Name Changed',
+          message: `PC name changed from "${oldPcName}" to "${pcName}" for system with MAC ID: ${macId}`,
+          oldValue: oldPcName,
+          newValue: pcName,
+          macId: macId,
+          isRead: 0
+        });
+      }
+      
+      return {
+        system: updated,
+        wasUpdated: true,
+        pcNameChanged,
+        oldPcName,
+        duplicateDetected: allSystemsWithMacId.length > 1,
+        duplicateSystems: allSystemsWithMacId.length > 1 ? allSystemsWithMacId : undefined
+      };
+    } else {
+      // New system - create it
+      // Store DATABASE SERVER time in lastConnected, and time offset for client time calculations
+      const newSystem = await this.createSystem({
+        pcName,
+        macId,
+        usbStatus: 0, // Default: USB disabled
+        machineOn: 1, // Online
+        lastConnected: dbServerTime, // DATABASE SERVER time
+        timeOffset: timeOffset, // Time offset in milliseconds
+        systemUserId: systemUserId !== undefined ? systemUserId : null
+      });
+      
+      // Create notification for new system registration
+      await this.createNotification({
+        machineId: newSystem.machineId,
+        notificationType: 'system_registered',
+        title: 'New System Registered',
+        message: `New system "${pcName}" registered with MAC ID: ${macId}`,
+        newValue: pcName,
+        macId: macId,
+        isRead: 0
+      });
+      
+      return {
+        system: newSystem,
+        wasUpdated: false,
+        pcNameChanged: false,
+        duplicateDetected: false
+      };
+    }
+  }
+
+  // ==================== SYSTEM NOTIFICATIONS ====================
+  async createNotification(notification: InsertSystemNotification): Promise<SystemNotification> {
+    const notificationUid = randomUUID();
+    const result = await db.insert(systemNotifications).values({
+      ...notification,
+      notificationUid
+    });
+    const insertedId = (result as any).insertId as number | undefined;
+    if (!insertedId) throw new Error("Failed to create notification");
+    const created = await db.select().from(systemNotifications).where(eq(systemNotifications.id, insertedId)).limit(1);
+    if (!created[0]) throw new Error("Failed to retrieve created notification");
+    return created[0];
+  }
+
+  async getNotifications(limit: number = 100, unreadOnly: boolean = false): Promise<SystemNotification[]> {
+    let query = db.select().from(systemNotifications);
+    
+    if (unreadOnly) {
+      query = query.where(eq(systemNotifications.isRead, 0)) as any;
+    }
+    
+    const result = await query.orderBy(desc(systemNotifications.createdAt)).limit(limit);
+    return result;
+  }
+
+  async markNotificationAsRead(id: number): Promise<SystemNotification | undefined> {
+    await db.update(systemNotifications)
+      .set({ isRead: 1 })
+      .where(eq(systemNotifications.id, id));
+    const result = await db.select().from(systemNotifications).where(eq(systemNotifications.id, id)).limit(1);
+    return result[0];
+  }
+
+  async markAllNotificationsAsRead(): Promise<number> {
+    const result = await db.update(systemNotifications)
+      .set({ isRead: 1 })
+      .where(eq(systemNotifications.isRead, 0));
+    return (result as any).affectedRows || 0;
+  }
+
+  async getUnreadNotificationCount(): Promise<number> {
+    const result = await db.select({ count: count() })
+      .from(systemNotifications)
+      .where(eq(systemNotifications.isRead, 0));
+    return result[0]?.count || 0;
   }
 }
 

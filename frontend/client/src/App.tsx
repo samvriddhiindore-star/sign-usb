@@ -14,6 +14,8 @@ import SystemUsersPage from "@/pages/system-users";
 import WebAccessControlPage from "@/pages/web-access-control";
 import ReportsPage from "@/pages/reports";
 import SettingsPage from "@/pages/settings";
+import NotificationsPage from "@/pages/notifications";
+import DuplicateMacIdsPage from "@/pages/duplicate-macids";
 import HelpIndex from "@/pages/help/index";
 import GettingStartedHelp from "@/pages/help/getting-started";
 import LoginHelp from "@/pages/help/login";
@@ -42,6 +44,8 @@ function Router() {
       <Route path="/web-access-control" component={WebAccessControlPage} />
       <Route path="/reports" component={ReportsPage} />
       <Route path="/logs" component={LogsPage} />
+      <Route path="/notifications" component={NotificationsPage} />
+      <Route path="/duplicate-macids" component={DuplicateMacIdsPage} />
       <Route path="/settings" component={SettingsPage} />
       
       {/* Help Pages */}

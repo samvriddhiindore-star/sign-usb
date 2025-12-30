@@ -309,37 +309,80 @@ export async function registerRoutes(
   });
 
   // ==================== SYSTEMS (CLIENT MASTER) ====================
+  // System registration endpoint - for desktop agents to register/update by MAC ID
+  // This endpoint does NOT require authentication (agents use this)
+  app.post("/api/systems/register", async (req, res) => {
+    try {
+      const schema = z.object({
+        pcName: z.string().min(1),
+        macId: z.string().min(1),
+        clientTime: z.string().optional(), // ISO string of client's current time
+        systemUserId: z.number().nullable().optional() // Optional system user ID to associate with
+      });
+      
+      const data = schema.parse(req.body);
+      
+      const result = await storage.registerOrUpdateSystemByMacId(data.pcName, data.macId, data.clientTime, data.systemUserId);
+      
+      // Calculate time offset info for response
+      let timeOffsetInfo = null;
+      if (result.system.timeOffset !== null && result.system.timeOffset !== undefined) {
+        const offsetMs = result.system.timeOffset;
+        const offsetHours = (offsetMs / (1000 * 60 * 60)).toFixed(2);
+        const offsetMinutes = (offsetMs / (1000 * 60)).toFixed(2);
+        timeOffsetInfo = {
+          milliseconds: offsetMs,
+          hours: parseFloat(offsetHours),
+          minutes: parseFloat(offsetMinutes),
+          description: offsetMs > 0 
+            ? `Server is ${offsetHours} hours ahead of client` 
+            : offsetMs < 0 
+            ? `Client is ${Math.abs(parseFloat(offsetHours))} hours ahead of server`
+            : 'Server and client times are synchronized'
+        };
+      }
+      
+      res.json({
+        success: true,
+        system: {
+          machineId: result.system.machineId,
+          pcName: result.system.pcName,
+          macId: result.system.macId,
+          machineOn: result.system.machineOn,
+          lastConnected: result.system.lastConnected?.toISOString() || null,
+          timeOffset: result.system.timeOffset
+        },
+        wasUpdated: result.wasUpdated,
+        pcNameChanged: result.pcNameChanged,
+        oldPcName: result.oldPcName || null,
+        timeOffsetInfo: timeOffsetInfo,
+        duplicateDetected: result.duplicateDetected || false,
+        duplicateSystems: result.duplicateSystems?.map(s => ({
+          machineId: s.machineId,
+          pcName: s.pcName,
+          systemUserId: s.systemUserId,
+          lastConnected: s.lastConnected?.toISOString() || null
+        })) || null
+      });
+    } catch (error: any) {
+      console.error("[SYSTEM REGISTRATION ERROR]", error);
+      res.status(400).json({ error: error.message });
+    }
+  });
+
   app.get("/api/systems", authMiddleware, async (req, res) => {
     try {
       const systems = await storage.getSystems();
       
-      // Helper function to check if system is online (last_connected within 1 minute)
-      const isSystemOnline = (machineOn: number | null, lastConnected: Date | null): boolean => {
-        if (machineOn === 0) return false;
-        if (!lastConnected) return false;
+      const systemsWithStatus = await Promise.all(systems.map(async (s) => {
+        const isOnline = await storage.isSystemOnline(s.machineOn, s.lastConnected, s.timeOffset);
         
-        const now = new Date();
-        const lastConnectedTime = new Date(lastConnected);
-        const diffInMs = now.getTime() - lastConnectedTime.getTime();
-        const diffInMinutes = diffInMs / (1000 * 60);
-        
-        // If last connected is more than 1 minute ago, consider offline
-        return diffInMinutes <= 1;
-      };
-      
-      res.json(systems.map(s => {
-        const isOnline = isSystemOnline(s.machineOn, s.lastConnected);
-        
-        // Debug logging for offline systems
+        // Debug logging for offline systems (using database server time)
         if (!isOnline && s.machineOn === 1) {
-          const now = new Date();
-          const lastConnectedTime = s.lastConnected ? new Date(s.lastConnected) : null;
-          const diffInMs = lastConnectedTime ? now.getTime() - lastConnectedTime.getTime() : null;
-          const diffInMinutes = diffInMs ? diffInMs / (1000 * 60) : null;
+          // Note: We can't easily get DB time here without another query, so we'll skip detailed logging
           console.log(`[DEBUG] System ${s.machineId} (${s.pcName}) marked offline:`, {
             machineOn: s.machineOn,
             lastConnected: s.lastConnected?.toISOString(),
-            diffInMinutes: diffInMinutes?.toFixed(2),
             status: 'offline'
           });
         }
@@ -363,8 +406,59 @@ export async function registerRoutes(
           } : null
         };
       }));
+      
+      res.json(systemsWithStatus);
     } catch (error: any) {
       res.status(500).json({ error: error.message });
+    }
+  });
+
+  // IMPORTANT: Specific routes must come BEFORE parameterized routes like /:id
+  // ==================== DUPLICATE MAC ID MANAGEMENT ====================
+  // Get all duplicate MAC IDs
+  app.get("/api/systems/duplicates", authMiddleware, async (req, res) => {
+    try {
+      console.log('[API] Fetching duplicate MAC IDs...');
+      const duplicates = await storage.getDuplicateMacIds();
+      console.log(`[API] Found ${duplicates.length} duplicate MAC ID groups`);
+      
+      const response = duplicates.map(dup => ({
+        macId: dup.macId,
+        count: dup.count,
+        systems: dup.systems.map(s => ({
+          machineId: s.machineId,
+          pcName: s.pcName,
+          macId: s.macId,
+          systemUserId: s.systemUserId,
+          lastConnected: s.lastConnected?.toISOString() || null,
+          createdAt: s.createdAt?.toISOString() || null
+        }))
+      }));
+      
+      console.log(`[API] Returning ${response.length} duplicate groups`);
+      res.json(response);
+    } catch (error: any) {
+      console.error('[API] Error fetching duplicate MAC IDs:', error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // Merge duplicate MAC IDs - keep one system and merge others into it
+  app.post("/api/systems/duplicates/merge", authMiddleware, async (req, res) => {
+    try {
+      const schema = z.object({
+        macId: z.string().min(1),
+        keepMachineId: z.number(), // The system to keep
+        mergeMachineIds: z.array(z.number()) // Systems to merge into the kept one
+      });
+      
+      const data = schema.parse(req.body);
+      
+      const result = await storage.mergeDuplicateMacId(data.macId, data.keepMachineId, data.mergeMachineIds);
+      
+      res.json(result);
+    } catch (error: any) {
+      res.status(400).json({ error: error.message });
     }
   });
 
@@ -376,21 +470,7 @@ export async function registerRoutes(
       const system = await storage.getSystem(id);
       if (!system) return res.status(404).json({ error: "System not found" });
       
-      // Helper function to check if system is online (last_connected within 1 minute)
-      const isSystemOnline = (machineOn: number | null, lastConnected: Date | null): boolean => {
-        if (machineOn === 0) return false;
-        if (!lastConnected) return false;
-        
-        const now = new Date();
-        const lastConnectedTime = new Date(lastConnected);
-        const diffInMs = now.getTime() - lastConnectedTime.getTime();
-        const diffInMinutes = diffInMs / (1000 * 60);
-        
-        // If last connected is more than 1 minute ago, consider offline
-        return diffInMinutes <= 1;
-      };
-      
-      const isOnline = isSystemOnline(system.machineOn, system.lastConnected);
+      const isOnline = await storage.isSystemOnline(system.machineOn, system.lastConnected, system.timeOffset);
       
       res.json({
         machineId: system.machineId,
@@ -571,23 +651,51 @@ export async function registerRoutes(
       const limit = req.query.limit ? parseInt(req.query.limit as string) : 100;
       const logs = await storage.getUsbLogsByMachine(id, limit);
       
-      res.json(logs.map(log => ({
-        id: log.id,
-        logUid: log.logUid || null,
-        machineId: log.machineId,
-        deviceName: log.deviceName,
-        deviceDescription: log.deviceDescription,
-        deviceManufacturer: log.deviceManufacturer,
-        devicePort: log.devicePort,
-        connectTime: log.deviceConnectTime?.toISOString() || null,
-        disconnectTime: log.deviceDisconnectTime?.toISOString() || null,
-        duration: log.deviceConnectTime && log.deviceDisconnectTime 
-          ? Math.round((new Date(log.deviceDisconnectTime).getTime() - new Date(log.deviceConnectTime).getTime()) / 1000)
-          : null,
-        status: log.deviceDisconnectTime ? 'Removed' : 'Connected',
-        deviceId: log.deviceId,
-        createdAt: log.createdAt?.toISOString() || null
-      })));
+      // Get system to check online status
+      const system = await storage.getSystem(id);
+      
+      const logsWithStatus = await Promise.all(logs.map(async (log) => {
+        let deviceStatus: string;
+        
+        // If device has a disconnect time, it's removed
+        if (log.deviceDisconnectTime) {
+          deviceStatus = 'Removed';
+        } else {
+          // Device doesn't have disconnect time - check if system is online
+          if (system) {
+            const isSystemOnline = await storage.isSystemOnline(
+              system.machineOn,
+              system.lastConnected,
+              system.timeOffset
+            );
+            // If system is offline, device is automatically disconnected
+            deviceStatus = isSystemOnline ? 'Connected' : 'Disconnected';
+          } else {
+            // System not found - assume disconnected
+            deviceStatus = 'Disconnected';
+          }
+        }
+        
+        return {
+          id: log.id,
+          logUid: log.logUid || null,
+          machineId: log.machineId,
+          deviceName: log.deviceName,
+          deviceDescription: log.deviceDescription,
+          deviceManufacturer: log.deviceManufacturer,
+          devicePort: log.devicePort,
+          connectTime: log.deviceConnectTime?.toISOString() || null,
+          disconnectTime: log.deviceDisconnectTime?.toISOString() || null,
+          duration: log.deviceConnectTime && log.deviceDisconnectTime 
+            ? Math.round((new Date(log.deviceDisconnectTime).getTime() - new Date(log.deviceConnectTime).getTime()) / 1000)
+            : null,
+          status: deviceStatus,
+          deviceId: log.deviceId,
+          createdAt: log.createdAt?.toISOString() || null
+        };
+      }));
+      
+      res.json(logsWithStatus);
     } catch (error: any) {
       res.status(500).json({ error: error.message });
     }
@@ -615,21 +723,7 @@ export async function registerRoutes(
     try {
       const systemUsersList = await storage.getSystemUsers();
       
-      // Helper function to check if system is online (last_connected within 1 minute)
-      const isSystemOnline = (machineOn: number | null, lastConnected: Date | null): boolean => {
-        if (machineOn === 0) return false;
-        if (!lastConnected) return false;
-        
-        const now = new Date();
-        const lastConnectedTime = new Date(lastConnected);
-        const diffInMs = now.getTime() - lastConnectedTime.getTime();
-        const diffInMinutes = diffInMs / (1000 * 60);
-        
-        // If last connected is more than 1 minute ago, consider offline
-        return diffInMinutes <= 1;
-      };
-      
-      res.json(systemUsersList.map(su => ({
+      const systemUsersWithStatus = await Promise.all(systemUsersList.map(async (su) => ({
         systemUserId: su.systemUserId,
         systemUserUid: su.systemUserUid || null,
         systemUserName: su.systemUserName,
@@ -637,8 +731,8 @@ export async function registerRoutes(
         isActive: su.isActive,
         usbPolicy: su.usbPolicy,
         assignedCount: su.assignedCount,
-        machines: su.machines.map(m => {
-          const isOnline = isSystemOnline(m.machineOn, m.lastConnected);
+        machines: await Promise.all(su.machines.map(async (m) => {
+          const isOnline = await storage.isSystemOnline(m.machineOn, m.lastConnected, m.timeOffset);
           return {
             machineId: m.machineId,
             pcName: m.pcName,
@@ -648,9 +742,11 @@ export async function registerRoutes(
             status: isOnline ? 'online' : 'offline',
             lastConnected: m.lastConnected?.toISOString() || null
           };
-        }),
+        })),
         createdAt: su.createdAt?.toISOString() || null
       })));
+      
+      res.json(systemUsersWithStatus);
     } catch (error: any) {
       res.status(500).json({ error: error.message });
     }
@@ -664,20 +760,6 @@ export async function registerRoutes(
       const systemUser = await storage.getSystemUser(id);
       if (!systemUser) return res.status(404).json({ error: "System user not found" });
       
-      // Helper function to check if system is online (last_connected within 1 minute)
-      const isSystemOnline = (machineOn: number | null, lastConnected: Date | null): boolean => {
-        if (machineOn === 0) return false;
-        if (!lastConnected) return false;
-        
-        const now = new Date();
-        const lastConnectedTime = new Date(lastConnected);
-        const diffInMs = now.getTime() - lastConnectedTime.getTime();
-        const diffInMinutes = diffInMs / (1000 * 60);
-        
-        // If last connected is more than 1 minute ago, consider offline
-        return diffInMinutes <= 1;
-      };
-      
       res.json({
         systemUserId: systemUser.systemUserId,
         systemUserUid: systemUser.systemUserUid || null,
@@ -686,8 +768,8 @@ export async function registerRoutes(
         isActive: systemUser.isActive,
         usbPolicy: systemUser.usbPolicy,
         assignedCount: systemUser.assignedCount,
-        machines: systemUser.machines.map(m => {
-          const isOnline = isSystemOnline(m.machineOn, m.lastConnected);
+        machines: await Promise.all(systemUser.machines.map(async (m) => {
+          const isOnline = await storage.isSystemOnline(m.machineOn, m.lastConnected, m.timeOffset);
           return {
             machineId: m.machineId,
             pcName: m.pcName,
@@ -697,7 +779,7 @@ export async function registerRoutes(
             status: isOnline ? 'online' : 'offline',
             lastConnected: m.lastConnected?.toISOString() || null
           };
-        }),
+        })),
         createdAt: systemUser.createdAt?.toISOString() || null
       });
     } catch (error: any) {
@@ -742,22 +824,8 @@ export async function registerRoutes(
             isActive: systemUserWithMachines.isActive,
             usbPolicy: systemUserWithMachines.usbPolicy,
             assignedCount: systemUserWithMachines.assignedCount,
-            machines: systemUserWithMachines.machines.map(m => {
-              // Helper function to check if system is online (last_connected within 1 minute)
-              const isSystemOnline = (machineOn: number | null, lastConnected: Date | null): boolean => {
-                if (machineOn === 0) return false;
-                if (!lastConnected) return false;
-                
-                const now = new Date();
-                const lastConnectedTime = new Date(lastConnected);
-                const diffInMs = now.getTime() - lastConnectedTime.getTime();
-                const diffInMinutes = diffInMs / (1000 * 60);
-                
-                // If last connected is more than 1 minute ago, consider offline
-                return diffInMinutes <= 1;
-              };
-              
-              const isOnline = isSystemOnline(m.machineOn, m.lastConnected);
+            machines: await Promise.all(systemUserWithMachines.machines.map(async (m) => {
+              const isOnline = await storage.isSystemOnline(m.machineOn, m.lastConnected, m.timeOffset);
               return {
                 machineId: m.machineId,
                 pcName: m.pcName,
@@ -767,7 +835,7 @@ export async function registerRoutes(
                 status: isOnline ? 'online' : 'offline',
                 lastConnected: m.lastConnected?.toISOString() || null
               };
-            }),
+            })),
             createdAt: systemUserWithMachines.createdAt?.toISOString() || null
           });
         }
@@ -1140,23 +1208,9 @@ export async function registerRoutes(
       const report = await storage.getDevicesByMachineReport();
       console.log('[API] Devices-by-machine report fetched:', report.length, 'machines');
       
-      // Helper function to check if system is online (last_connected within 1 minute)
-      const isSystemOnline = (machineOn: number | null, lastConnected: Date | null): boolean => {
-        if (machineOn === 0) return false;
-        if (!lastConnected) return false;
-        
-        const now = new Date();
-        const lastConnectedTime = new Date(lastConnected);
-        const diffInMs = now.getTime() - lastConnectedTime.getTime();
-        const diffInMinutes = diffInMs / (1000 * 60);
-        
-        // If last connected is more than 1 minute ago, consider offline
-        return diffInMinutes <= 1;
-      };
-      
       // Add calculated status to each machine in the report and serialize dates
-      const reportWithStatus = report.map(machine => {
-        const isOnline = isSystemOnline(machine.machineOn, machine.lastConnected);
+      const reportWithStatus = await Promise.all(report.map(async (machine) => {
+        const isOnline = await storage.isSystemOnline(machine.machineOn, machine.lastConnected, machine.timeOffset);
         return {
           machineId: machine.machineId,
           pcName: machine.pcName,
@@ -1181,7 +1235,7 @@ export async function registerRoutes(
             updatedAt: d.updatedAt?.toISOString() || null
           }))
         };
-      });
+      }));
       
       res.json(reportWithStatus);
     } catch (error: any) {
@@ -1362,20 +1416,43 @@ export async function registerRoutes(
       const limit = req.query.limit ? parseInt(req.query.limit as string) : 1000;
       const logs = await storage.getUsbLogs(limit);
       
+      // Get all systems to check online status
+      const systems = await storage.getSystems();
+      const systemsMap = new Map(systems.map(s => [s.machineId, s]));
+      
       const csv = [
         ['ID', 'Machine ID', 'PC Name', 'Device Name', 'Device ID', 'Manufacturer', 'Port', 'Connect Time', 'Disconnect Time', 'Status'].join(','),
-        ...logs.map(l => [
-          l.id,
-          l.machineId,
-          `"${(l.pcName || '').replace(/"/g, '""')}"`,
-          `"${(l.deviceName || '').replace(/"/g, '""')}"`,
-          `"${(l.deviceId || '').replace(/"/g, '""')}"`,
-          `"${(l.deviceManufacturer || '').replace(/"/g, '""')}"`,
-          l.devicePort || '',
-          l.deviceConnectTime?.toISOString() || '',
-          l.deviceDisconnectTime?.toISOString() || '',
-          l.deviceDisconnectTime ? 'Removed' : 'Connected'
-        ].join(','))
+        ...(await Promise.all(logs.map(async (l) => {
+          let deviceStatus: string;
+          if (l.deviceDisconnectTime) {
+            deviceStatus = 'Removed';
+          } else {
+            const system = systemsMap.get(l.machineId);
+            if (system) {
+              const isSystemOnline = await storage.isSystemOnline(
+                system.machineOn,
+                system.lastConnected,
+                system.timeOffset
+              );
+              deviceStatus = isSystemOnline ? 'Connected' : 'Disconnected';
+            } else {
+              deviceStatus = 'Disconnected';
+            }
+          }
+          
+          return [
+            l.id,
+            l.machineId,
+            `"${(l.pcName || '').replace(/"/g, '""')}"`,
+            `"${(l.deviceName || '').replace(/"/g, '""')}"`,
+            `"${(l.deviceId || '').replace(/"/g, '""')}"`,
+            `"${(l.deviceManufacturer || '').replace(/"/g, '""')}"`,
+            l.devicePort || '',
+            l.deviceConnectTime?.toISOString() || '',
+            l.deviceDisconnectTime?.toISOString() || '',
+            deviceStatus
+          ].join(',');
+        })))
       ].join('\n');
 
       res.setHeader('Content-Type', 'text/csv');
@@ -1391,24 +1468,10 @@ export async function registerRoutes(
     try {
       const systems = await storage.getSystems();
       
-      // Helper function to check if system is online (last_connected within 1 minute)
-      const isSystemOnline = (machineOn: number | null, lastConnected: Date | null): boolean => {
-        if (machineOn === 0) return false;
-        if (!lastConnected) return false;
-        
-        const now = new Date();
-        const lastConnectedTime = new Date(lastConnected);
-        const diffInMs = now.getTime() - lastConnectedTime.getTime();
-        const diffInMinutes = diffInMs / (1000 * 60);
-        
-        // If last connected is more than 1 minute ago, consider offline
-        return diffInMinutes <= 1;
-      };
-      
       const csv = [
         ['Machine ID', 'PC Name', 'MAC ID', 'USB Status', 'Online Status', 'System User', 'Last Connected', 'Created At'].join(','),
-        ...systems.map(s => {
-          const isOnline = isSystemOnline(s.machineOn, s.lastConnected);
+        ...(await Promise.all(systems.map(async (s) => {
+          const isOnline = await storage.isSystemOnline(s.machineOn, s.lastConnected, s.timeOffset);
           return [
             s.machineId,
             `"${(s.pcName || '').replace(/"/g, '""')}"`,
@@ -1419,12 +1482,76 @@ export async function registerRoutes(
             s.lastConnected?.toISOString() || '',
             s.createdAt?.toISOString() || ''
           ].join(',');
-        })
+        })))
       ].join('\n');
 
       res.setHeader('Content-Type', 'text/csv');
       res.setHeader('Content-Disposition', `attachment; filename=systems-report-${new Date().toISOString().split('T')[0]}.csv`);
       res.send(csv);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // ==================== SYSTEM NOTIFICATIONS ====================
+  app.get("/api/notifications", authMiddleware, async (req, res) => {
+    try {
+      const limit = req.query.limit ? parseInt(req.query.limit as string) : 100;
+      const unreadOnly = req.query.unreadOnly === 'true';
+      
+      const notifications = await storage.getNotifications(limit, unreadOnly);
+      
+      res.json(notifications.map(n => ({
+        id: n.id,
+        notificationUid: n.notificationUid || null,
+        machineId: n.machineId,
+        notificationType: n.notificationType,
+        title: n.title,
+        message: n.message,
+        oldValue: n.oldValue || null,
+        newValue: n.newValue || null,
+        macId: n.macId || null,
+        isRead: n.isRead,
+        createdAt: n.createdAt?.toISOString() || null
+      })));
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.get("/api/notifications/unread-count", authMiddleware, async (req, res) => {
+    try {
+      const count = await storage.getUnreadNotificationCount();
+      res.json({ count });
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.put("/api/notifications/:id/read", authMiddleware, async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) return res.status(400).json({ error: "Invalid notification ID" });
+      
+      const notification = await storage.markNotificationAsRead(id);
+      if (!notification) return res.status(404).json({ error: "Notification not found" });
+      
+      res.json({
+        success: true,
+        notification: {
+          id: notification.id,
+          isRead: notification.isRead
+        }
+      });
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.put("/api/notifications/read-all", authMiddleware, async (req, res) => {
+    try {
+      const affected = await storage.markAllNotificationsAsRead();
+      res.json({ success: true, affected });
     } catch (error: any) {
       res.status(500).json({ error: error.message });
     }
