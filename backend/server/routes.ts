@@ -370,6 +370,8 @@ export async function registerRoutes(
     }
   });
 
+
+
   app.get("/api/systems", authMiddleware, async (req, res) => {
     try {
       const systems = await storage.getSystems();
@@ -602,6 +604,24 @@ export async function registerRoutes(
     }
   });
 
+  // MOVED UP: Specific routes first
+  app.get("/api/systems/disconnected", authMiddleware, async (req, res) => {
+    try {
+      const days = req.query.days ? parseInt(req.query.days as string) : 7;
+      const systems = await storage.getDisconnectedSystems(days);
+      res.json(systems.map(s => ({
+        machineId: s.machineId,
+        machineUid: s.machineUid || null,
+        pcName: s.pcName,
+        macId: s.macId,
+        lastConnected: s.lastConnected?.toISOString() || null,
+        remark: s.remark
+      })));
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
   app.get("/api/systems/:id", authMiddleware, async (req, res) => {
     try {
       const id = parseInt(req.params.id);
@@ -637,24 +657,39 @@ export async function registerRoutes(
     }
   });
 
-  app.get("/api/systems/disconnected", authMiddleware, async (req, res) => {
+
+
+
+  // MOVED UP: Bulk USB control first
+  app.put("/api/systems/bulk/usb", authMiddleware, async (req, res) => {
     try {
-      const days = req.query.days ? parseInt(req.query.days as string) : 7;
-      const systems = await storage.getDisconnectedSystems(days);
-      res.json(systems.map(s => ({
-        machineId: s.machineId,
-        machineUid: s.machineUid || null,
-        pcName: s.pcName,
-        macId: s.macId,
-        lastConnected: s.lastConnected?.toISOString() || null,
-        remark: s.remark
-      })));
+      const schema = z.object({
+        machineIds: z.array(z.number()),
+        enabled: z.boolean()
+      });
+
+      const data = schema.parse(req.body);
+      const usbStatus = data.enabled ? 1 : 0;
+
+      const affected = await storage.bulkUpdateUsbStatus(data.machineIds, usbStatus);
+
+      // Send commands to online agents
+      for (const id of data.machineIds) {
+        const system = await storage.getSystem(id);
+        if (system && system.machineOn === 1) {
+          const command = data.enabled ? "EnableUsb" : "DisableUsb";
+          sendCommandToAgent(system.macId, io, command, { machineId: id });
+        }
+      }
+
+      res.json({ success: true, affected });
     } catch (error: any) {
       res.status(500).json({ error: error.message });
     }
   });
 
   // Enable/Disable USB for a system
+
   app.put("/api/systems/:id/usb", authMiddleware, async (req, res) => {
     try {
       const id = parseInt(req.params.id);
@@ -688,27 +723,19 @@ export async function registerRoutes(
     }
   });
 
-  // Bulk USB control
-  app.put("/api/systems/bulk/usb", authMiddleware, async (req, res) => {
+
+
+
+  // MOVED UP: Bulk assign system user first
+  app.put("/api/systems/bulk/system-user", authMiddleware, async (req, res) => {
     try {
       const schema = z.object({
         machineIds: z.array(z.number()),
-        enabled: z.boolean()
+        systemUserId: z.number().nullable()
       });
 
       const data = schema.parse(req.body);
-      const usbStatus = data.enabled ? 1 : 0;
-
-      const affected = await storage.bulkUpdateUsbStatus(data.machineIds, usbStatus);
-
-      // Send commands to online agents
-      for (const id of data.machineIds) {
-        const system = await storage.getSystem(id);
-        if (system && system.machineOn === 1) {
-          const command = data.enabled ? "EnableUsb" : "DisableUsb";
-          sendCommandToAgent(system.macId, io, command, { machineId: id });
-        }
-      }
+      const affected = await storage.bulkAssignSystemUser(data.machineIds, data.systemUserId);
 
       res.json({ success: true, affected });
     } catch (error: any) {
@@ -717,6 +744,7 @@ export async function registerRoutes(
   });
 
   // Assign system user to a system
+
   app.put("/api/systems/:id/system-user", authMiddleware, async (req, res) => {
     try {
       const id = parseInt(req.params.id);
@@ -743,22 +771,7 @@ export async function registerRoutes(
     }
   });
 
-  // Bulk assign system user
-  app.put("/api/systems/bulk/system-user", authMiddleware, async (req, res) => {
-    try {
-      const schema = z.object({
-        machineIds: z.array(z.number()),
-        systemUserId: z.number().nullable()
-      });
 
-      const data = schema.parse(req.body);
-      const affected = await storage.bulkAssignSystemUser(data.machineIds, data.systemUserId);
-
-      res.json({ success: true, affected });
-    } catch (error: any) {
-      res.status(500).json({ error: error.message });
-    }
-  });
 
   // ==================== USB LOGS ====================
   app.get("/api/usb-logs", authMiddleware, async (req, res) => {
