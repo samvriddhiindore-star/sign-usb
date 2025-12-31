@@ -767,23 +767,13 @@ class DatabaseStorage implements IStorage {
   async assignSystemUserToSystem(machineId: number, systemUserId: number | null): Promise<ClientMaster | undefined> {
     // Enforce one system user per machine: if assigning a system user, unassign it from any other machine first
     if (systemUserId !== null) {
-      // Find any other machine that has this system user assigned
-      const existingMachines = await db.select()
-        .from(clientMaster)
+      // Find any other machine that has this system user assigned and unassign
+      await db.update(clientMaster)
+        .set({ systemUserId: null })
         .where(and(
           eq(clientMaster.systemUserId, systemUserId),
           ne(clientMaster.machineId, machineId)
         ));
-
-      // Unassign the system user from other machines
-      if (existingMachines.length > 0) {
-        await db.update(clientMaster)
-          .set({ systemUserId: null })
-          .where(and(
-            eq(clientMaster.systemUserId, systemUserId),
-            ne(clientMaster.machineId, machineId)
-          ));
-      }
     }
 
     // Assign the system user to the requested machine
@@ -791,32 +781,59 @@ class DatabaseStorage implements IStorage {
       .set({ systemUserId })
       .where(eq(clientMaster.machineId, machineId));
 
-    const result = await db.select().from(clientMaster).where(eq(clientMaster.machineId, machineId)).limit(1);
-    return result[0];
+    // Return the updated machine using raw SQL to avoid missing column issues
+    const result = await db.execute(sql`
+      SELECT 
+        machine_id, machine_uid, pc_name, mac_id, usb_status, machine_on,
+        last_connected, time_offset, remark, created_at, profile_id
+      FROM client_master
+      WHERE machine_id = ${machineId}
+      LIMIT 1
+    `);
+
+    // Extract row from result
+    let row: any = null;
+    if (Array.isArray(result) && result.length > 0) {
+      if (Array.isArray(result[0]) && result[0].length > 0) {
+        row = result[0][0];
+      } else if (typeof result[0] === 'object' && result[0].machine_id !== undefined) {
+        row = result[0];
+      }
+    }
+
+    if (!row) return undefined;
+
+    return {
+      machineId: row.machine_id,
+      machineUid: row.machine_uid || null,
+      pcName: row.pc_name,
+      macId: row.mac_id,
+      usbStatus: row.usb_status,
+      machineOn: row.machine_on,
+      lastConnected: row.last_connected ? new Date(row.last_connected) : null,
+      timeOffset: row.time_offset,
+      clientStatus: null,
+      clientStatusUpdatedAt: null,
+      lastUpdated: null,
+      remark: row.remark || null,
+      createdAt: row.created_at ? new Date(row.created_at) : null,
+      systemUserId: row.profile_id || null,
+    } as ClientMaster;
   }
+
 
   async bulkAssignSystemUser(machineIds: number[], systemUserId: number | null): Promise<number> {
     if (machineIds.length === 0) return 0;
 
     // Enforce one system user per machine: if assigning a system user, unassign it from any other machines first
     if (systemUserId !== null) {
-      // Find any machines that have this system user assigned (excluding the ones we're assigning to)
-      const existingMachines = await db.select()
-        .from(clientMaster)
+      // Directly unassign the system user from other machines (no need to select first)
+      await db.update(clientMaster)
+        .set({ systemUserId: null })
         .where(and(
           eq(clientMaster.systemUserId, systemUserId),
           sql`${clientMaster.machineId} NOT IN (${sql.join(machineIds.map(id => sql`${id}`), sql`, `)})`
         ));
-
-      // Unassign the system user from other machines
-      if (existingMachines.length > 0) {
-        await db.update(clientMaster)
-          .set({ systemUserId: null })
-          .where(and(
-            eq(clientMaster.systemUserId, systemUserId),
-            sql`${clientMaster.machineId} NOT IN (${sql.join(machineIds.map(id => sql`${id}`), sql`, `)})`
-          ));
-      }
     }
 
     // Assign the system user to the requested machines
@@ -826,11 +843,51 @@ class DatabaseStorage implements IStorage {
     return (result as any).affectedRows ?? machineIds.length;
   }
 
+
   async getSystemsBySystemUser(systemUserId: number): Promise<ClientMaster[]> {
-    return await db.select().from(clientMaster)
-      .where(eq(clientMaster.systemUserId, systemUserId))
-      .orderBy(desc(clientMaster.lastConnected));
+    try {
+      // Use raw SQL to avoid selecting columns that may not exist in the database
+      const result = await db.execute(sql`
+        SELECT 
+          machine_id, machine_uid, pc_name, mac_id, usb_status, machine_on,
+          last_connected, time_offset, remark, created_at, profile_id
+        FROM client_master
+        WHERE profile_id = ${systemUserId}
+        ORDER BY last_connected DESC
+      `);
+
+      // Extract rows from result (handle nested array structure)
+      let rows: any[] = [];
+      if (Array.isArray(result) && result.length > 0) {
+        if (Array.isArray(result[0])) {
+          rows = result[0];
+        } else if (typeof result[0] === 'object' && result[0].machine_id !== undefined) {
+          rows = result;
+        }
+      }
+
+      return rows.map((row: any) => ({
+        machineId: row.machine_id,
+        machineUid: row.machine_uid || null,
+        pcName: row.pc_name,
+        macId: row.mac_id,
+        usbStatus: row.usb_status,
+        machineOn: row.machine_on,
+        lastConnected: row.last_connected ? new Date(row.last_connected) : null,
+        timeOffset: row.time_offset,
+        clientStatus: null,
+        clientStatusUpdatedAt: null,
+        lastUpdated: null,
+        remark: row.remark || null,
+        createdAt: row.created_at ? new Date(row.created_at) : null,
+        systemUserId: row.profile_id || null,
+      })) as ClientMaster[];
+    } catch (error: any) {
+      console.error('[getSystemsBySystemUser] Error:', error.message);
+      return [];
+    }
   }
+
 
   // ==================== USB LOGS METHODS ====================
   async getUsbLogs(limit: number = 500): Promise<(ClientUsbStatus & { pcName?: string })[]> {
