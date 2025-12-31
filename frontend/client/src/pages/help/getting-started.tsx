@@ -39,7 +39,7 @@ export default function GettingStartedHelp() {
           <CardContent className="space-y-4">
             <ol className="list-decimal list-inside space-y-2 text-sm">
               <li>Open your web browser</li>
-              <li>Navigate to the SIGN - USB application URL (e.g., <code className="bg-muted px-1 py-0.5 rounded">http://localhost:3000</code> or your production URL)</li>
+              <li>Navigate to the SIGN - USB application URL (provided by your administrator)</li>
               <li>You will be redirected to the login page if not authenticated</li>
             </ol>
             <div className="mt-4 p-3 bg-muted rounded-lg">
