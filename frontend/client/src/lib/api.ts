@@ -951,4 +951,18 @@ export const api = {
     
     return response.json();
   },
+
+  async syncDuplicateMacIds(): Promise<{ success: boolean; merged: number; groups: number; message: string }> {
+    const response = await fetch(`${API_BASE}/systems/sync-duplicates`, {
+      method: 'POST',
+      headers: getAuthHeaders()
+    });
+    
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.error || 'Failed to sync duplicate MAC IDs');
+    }
+    
+    return response.json();
+  },
 };

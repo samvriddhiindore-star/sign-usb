@@ -22,7 +22,7 @@ export default function ReportsHelp() {
         <Card>
           <CardHeader><CardTitle>Overview</CardTitle></CardHeader>
           <CardContent className="text-sm space-y-2">
-            <p>The reports page provides detailed analytics across 4 tabs: Devices, Analytics, USB Activity, and System Health.</p>
+            <p>The reports page provides detailed analytics across 4 tabs: USB Devices, Analytics, USB Activity, and System Health.</p>
           </CardContent>
         </Card>
       </div>

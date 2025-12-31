@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { api, DevicesByMachineReport, SystemHealthReport, DeviceAnalyticsReport } from "@/lib/api";
+import { api, DevicesByMachineReport, DeviceAnalyticsReport } from "@/lib/api";
 import Layout from "@/components/Layout";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -13,9 +13,9 @@ import {
 import { Progress } from "@/components/ui/progress";
 import { 
   Monitor, HardDrive, Usb, Download, RefreshCw, Loader2,
-  Check, X, Wifi, WifiOff, Shield, Activity, BarChart3,
+  Check, X, Wifi, WifiOff, Shield, BarChart3,
   TrendingUp, FileSpreadsheet, Calendar, ChevronRight, 
-  Search, Filter, Clock, Building2, Zap
+  Search, Clock, Building2
 } from "lucide-react";
 import { formatDistanceToNow, format } from "date-fns";
 import { useToast } from "@/hooks/use-toast";
@@ -36,10 +36,6 @@ export default function ReportsPage() {
   });
 
 
-  const { data: healthReport, isLoading: loadingHealth, refetch: refetchHealth } = useQuery({
-    queryKey: ['reports', 'system-health'],
-    queryFn: api.getSystemHealthReport
-  });
 
   const { data: deviceAnalytics, isLoading: loadingAnalytics, refetch: refetchAnalytics } = useQuery({
     queryKey: ['reports', 'device-analytics'],
@@ -96,8 +92,6 @@ export default function ReportsPage() {
 
   const handleRefreshAll = () => {
     refetchDevices();
-    refetchUsb();
-    refetchHealth();
     refetchAnalytics();
     toast({ title: "Reports refreshed" });
   };
@@ -112,15 +106,16 @@ export default function ReportsPage() {
       machine.pcName.toLowerCase().includes(searchQuery.toLowerCase()) ||
       machine.macId.toLowerCase().includes(searchQuery.toLowerCase());
     
-    const machineStatus = (machine as any).status || (machine.machineOn === 1 ? 'online' : 'offline');
+    // Use the status field from API (which includes clientStatus logic)
+    const machineStatus = (machine as any).status || 'offline';
     const matchesStatus = statusFilter === 'all' || machineStatus === statusFilter;
     
     return matchesSearch && matchesStatus;
   }) || [];
 
-  // Get machine status
+  // Get machine status - use API status field (includes clientStatus logic)
   const getMachineStatus = (machine: any) => {
-    return machine.status || (machine.machineOn === 1 ? 'online' : 'offline');
+    return (machine as any).status || 'offline';
   };
 
   return (
@@ -138,7 +133,7 @@ export default function ReportsPage() {
               Reports & Analytics
             </h1>
             <p className="text-muted-foreground mt-1">
-              Device mapping, USB activity, and system health reports
+              USB Device mapping and analytics reports
             </p>
           </div>
           <div className="flex gap-2 flex-wrap">
@@ -148,7 +143,7 @@ export default function ReportsPage() {
             </Button>
             <Button onClick={() => handleExport('devices')} variant="outline" size="sm">
               <Download className="h-4 w-4 mr-2" />
-              Export Devices
+              Export USB Devices
             </Button>
             <Button onClick={() => handleExport('usb-logs')} variant="outline" size="sm">
               <FileSpreadsheet className="h-4 w-4 mr-2" />
@@ -166,63 +161,43 @@ export default function ReportsPage() {
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           transition={{ delay: 0.1 }}
-          className="grid gap-4 grid-cols-2 md:grid-cols-4 lg:grid-cols-6"
+          className="grid gap-4 grid-cols-1 md:grid-cols-2 lg:grid-cols-3"
         >
-          <Card className="border-l-4 border-l-blue-500 hover:shadow-md transition-shadow">
-            <CardContent className="pt-4">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-xs text-muted-foreground">Total Systems</p>
-                  <p className="text-2xl font-bold">{healthReport?.totalSystems || 0}</p>
-                </div>
-                <Monitor className="h-6 w-6 text-blue-500 opacity-60" />
-              </div>
-            </CardContent>
-          </Card>
-          <Card className="border-l-4 border-l-emerald-500 hover:shadow-md transition-shadow">
-            <CardContent className="pt-4">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-xs text-muted-foreground">Online</p>
-                  <p className="text-2xl font-bold text-emerald-600">{healthReport?.onlineSystems || 0}</p>
-                </div>
-                <Wifi className="h-6 w-6 text-emerald-500 opacity-60" />
-              </div>
-            </CardContent>
-          </Card>
-          <Card className="border-l-4 border-l-amber-500 hover:shadow-md transition-shadow">
-            <CardContent className="pt-4">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-xs text-muted-foreground">Offline</p>
-                  <p className="text-2xl font-bold text-amber-600">{healthReport?.offlineSystems || 0}</p>
-                </div>
-                <WifiOff className="h-6 w-6 text-amber-500 opacity-60" />
-              </div>
-            </CardContent>
-          </Card>
           <Card className="border-l-4 border-l-purple-500 hover:shadow-md transition-shadow">
             <CardContent className="pt-4">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-xs text-muted-foreground">Total Devices</p>
+                  <p className="text-xs text-muted-foreground">Total USB Devices</p>
                   <p className="text-2xl font-bold text-purple-600">{totalDevices}</p>
                 </div>
                 <HardDrive className="h-6 w-6 text-purple-500 opacity-60" />
               </div>
             </CardContent>
           </Card>
-          <Card className="border-l-4 border-l-rose-500 hover:shadow-md transition-shadow">
+          <Card className="border-l-4 border-l-blue-500 hover:shadow-md transition-shadow">
             <CardContent className="pt-4">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-xs text-muted-foreground">Inactive</p>
-                  <p className="text-2xl font-bold text-rose-600">{healthReport?.inactiveSystems?.length || 0}</p>
+                  <p className="text-xs text-muted-foreground">Machines with Devices</p>
+                  <p className="text-2xl font-bold">{totalMachinesWithDevices}</p>
                 </div>
-                <Shield className="h-6 w-6 text-rose-500 opacity-60" />
+                <Monitor className="h-6 w-6 text-blue-500 opacity-60" />
               </div>
             </CardContent>
           </Card>
+          {deviceAnalytics && (
+            <Card className="border-l-4 border-l-emerald-500 hover:shadow-md transition-shadow">
+              <CardContent className="pt-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-xs text-muted-foreground">Allowed USB Devices</p>
+                    <p className="text-2xl font-bold text-emerald-600">{deviceAnalytics.summary.allowedDevices}</p>
+                  </div>
+                  <Check className="h-6 w-6 text-emerald-500 opacity-60" />
+                </div>
+              </CardContent>
+            </Card>
+          )}
         </motion.div>
 
         {/* Main Report Tabs */}
@@ -230,18 +205,14 @@ export default function ReportsPage() {
           setActiveTab(val);
           setSelectedMachine(null);
         }}>
-          <TabsList className="grid w-full grid-cols-4 lg:w-[500px]">
+          <TabsList className="grid w-full grid-cols-2 lg:w-[400px]">
             <TabsTrigger value="devices" className="gap-2">
               <HardDrive className="h-4 w-4" />
-              Devices
+              USB Devices
             </TabsTrigger>
             <TabsTrigger value="analytics" className="gap-2">
               <BarChart3 className="h-4 w-4" />
               Analytics
-            </TabsTrigger>
-            <TabsTrigger value="health" className="gap-2">
-              <Activity className="h-4 w-4" />
-              System Health
             </TabsTrigger>
           </TabsList>
 
@@ -363,7 +334,7 @@ export default function ReportsPage() {
                                     <div className="flex items-center justify-between text-sm">
                                       <span className="text-muted-foreground flex items-center gap-1">
                                         <HardDrive className="h-4 w-4" />
-                                        Total Devices
+                                        Total USB Devices
                                       </span>
                                       <span className="font-semibold">{machine.totalDevices}</span>
                                     </div>
@@ -419,7 +390,7 @@ export default function ReportsPage() {
                                   {/* Click Hint */}
                                   <div className="pt-2 border-t">
                                     <p className="text-xs text-muted-foreground text-center">
-                                      Click to view devices
+                                      Click to view USB devices
                                     </p>
                                   </div>
                                 </div>
@@ -463,7 +434,7 @@ export default function ReportsPage() {
                           {machineDeviceReport && (
                             <div className="flex gap-2">
                               <Badge variant="outline" className="text-sm">
-                                {machineDeviceReport.summary.totalDevices} Devices
+                                {machineDeviceReport.summary.totalDevices} USB Devices
                               </Badge>
                             </div>
                           )}
@@ -482,7 +453,7 @@ export default function ReportsPage() {
                                 <CardContent className="pt-4">
                                   <div className="flex items-center justify-between">
                                     <div>
-                                      <p className="text-xs text-muted-foreground">Total Devices</p>
+                                      <p className="text-xs text-muted-foreground">Total USB Devices</p>
                                       <p className="text-2xl font-bold">{machineDeviceReport.summary.totalDevices}</p>
                                     </div>
                                     <HardDrive className="h-6 w-6 text-primary opacity-60" />
@@ -554,7 +525,7 @@ export default function ReportsPage() {
                               <CardHeader>
                                 <CardTitle className="flex items-center gap-2">
                                   <Usb className="h-5 w-5" />
-                                  All Devices ({machineDeviceReport.devices.length})
+                                  All USB Devices ({machineDeviceReport.devices.length})
                                 </CardTitle>
                               </CardHeader>
                               <CardContent>
@@ -618,7 +589,7 @@ export default function ReportsPage() {
                         ) : (
                           <div className="text-center py-12 text-muted-foreground">
                             <HardDrive className="h-12 w-12 mx-auto mb-3 opacity-20" />
-                            <p>No device data available for this machine</p>
+                            <p>No USB device data available for this machine</p>
                           </div>
                         )}
                       </CardContent>
@@ -664,7 +635,7 @@ export default function ReportsPage() {
                     <CardContent className="pt-4">
                       <div className="flex items-center justify-between">
                         <div>
-                          <p className="text-xs text-muted-foreground">Total Devices</p>
+                          <p className="text-xs text-muted-foreground">Total USB Devices</p>
                           <p className="text-2xl font-bold">{deviceAnalytics.summary.totalDevices}</p>
                         </div>
                         <HardDrive className="h-6 w-6 text-primary opacity-60" />
@@ -766,9 +737,9 @@ export default function ReportsPage() {
                     <CardHeader>
                       <CardTitle className="text-lg flex items-center gap-2">
                         <HardDrive className="h-5 w-5" />
-                        Most Common Devices
+                        Most Common USB Devices
                       </CardTitle>
-                      <CardDescription>Devices found across multiple machines</CardDescription>
+                      <CardDescription>USB Devices found across multiple machines</CardDescription>
                     </CardHeader>
                     <CardContent>
                       <div className="space-y-3">
@@ -796,7 +767,7 @@ export default function ReportsPage() {
                   <CardHeader>
                     <CardTitle className="flex items-center gap-2">
                       <Monitor className="h-5 w-5" />
-                      Machines with Devices ({deviceAnalytics.byMachine.length})
+                      Machines with USB Devices ({deviceAnalytics.byMachine.length})
                     </CardTitle>
                     <CardDescription>Detailed device breakdown by machine</CardDescription>
                   </CardHeader>
@@ -807,7 +778,7 @@ export default function ReportsPage() {
                           <TableRow>
                             <TableHead>Machine</TableHead>
                             <TableHead>MAC ID</TableHead>
-                            <TableHead>Total Devices</TableHead>
+                            <TableHead>Total USB Devices</TableHead>
                             <TableHead>Allowed</TableHead>
                             <TableHead>Blocked</TableHead>
                             <TableHead>Last Device Added</TableHead>
@@ -854,9 +825,9 @@ export default function ReportsPage() {
                     <CardHeader>
                       <CardTitle className="flex items-center gap-2 text-amber-600">
                         <WifiOff className="h-5 w-5" />
-                        Offline Systems with Devices ({deviceAnalytics.offlineSystems.length})
+                        Offline Systems with USB Devices ({deviceAnalytics.offlineSystems.length})
                       </CardTitle>
-                      <CardDescription>Systems that are offline but have registered devices</CardDescription>
+                      <CardDescription>Systems that are offline but have registered USB devices</CardDescription>
                     </CardHeader>
                     <CardContent>
                       <div className="space-y-2">
@@ -870,7 +841,7 @@ export default function ReportsPage() {
                               </div>
                             </div>
                             <div className="flex items-center gap-4">
-                              <Badge variant="outline">{system.totalDevices} devices</Badge>
+                              <Badge variant="outline">{system.totalDevices} USB devices</Badge>
                               {system.lastConnected && (
                                 <span className="text-xs text-muted-foreground">
                                   Last seen: {formatDistanceToNow(new Date(system.lastConnected), { addSuffix: true })}
@@ -889,9 +860,9 @@ export default function ReportsPage() {
                   <CardHeader>
                     <CardTitle className="flex items-center gap-2">
                       <Calendar className="h-5 w-5" />
-                      Recent Devices ({deviceAnalytics.recentDevices.length})
+                      Recent USB Devices ({deviceAnalytics.recentDevices.length})
                     </CardTitle>
-                    <CardDescription>Recently registered devices across all machines</CardDescription>
+                    <CardDescription>Recently registered USB devices across all machines</CardDescription>
                   </CardHeader>
                   <CardContent>
                     <div className="rounded-md border">
@@ -944,8 +915,8 @@ export default function ReportsPage() {
             ) : deviceAnalytics && deviceAnalytics.summary && deviceAnalytics.summary.totalDevices === 0 ? (
               <div className="text-center py-12 text-muted-foreground">
                 <BarChart3 className="h-12 w-12 mx-auto mb-3 opacity-20" />
-                <p>No device data found in device_master table</p>
-                <p className="text-sm mt-2">Devices will appear here once they are registered in the system</p>
+                <p>No USB device data found in device_master table</p>
+                <p className="text-sm mt-2">USB Devices will appear here once they are registered in the system</p>
                 <Button 
                   variant="outline" 
                   size="sm" 
@@ -971,194 +942,6 @@ export default function ReportsPage() {
                   Retry
                 </Button>
               </div>
-            )}
-          </TabsContent>
-
-
-          {/* System Health Tab - Keep existing */}
-          <TabsContent value="health" className="space-y-4 mt-4">
-            <div className="grid gap-4 md:grid-cols-2">
-              {/* Systems by Profile */}
-              <Card>
-                <CardHeader>
-                  <CardTitle className="text-lg flex items-center gap-2">
-                    <Shield className="h-5 w-5" />
-                    Systems by Profile
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  {loadingHealth ? (
-                    <div className="flex items-center justify-center py-8">
-                      <Loader2 className="h-6 w-6 animate-spin" />
-                    </div>
-                  ) : (
-                    <div className="space-y-3">
-                      {healthReport?.systemsBySystemUser.map((item) => {
-                        const total = healthReport.totalSystems || 1;
-                        const percentage = (item.count / total) * 100;
-                        return (
-                          <div key={item.systemUserId ?? 'none'} className="space-y-1">
-                            <div className="flex justify-between text-sm">
-                              <span className="font-medium">{item.systemUserName}</span>
-                              <span className="text-muted-foreground">{item.count} systems ({percentage.toFixed(1)}%)</span>
-                            </div>
-                            <Progress value={percentage} className="h-2" />
-                          </div>
-                        );
-                      })}
-                      {(!healthReport?.systemsBySystemUser || healthReport.systemsBySystemUser.length === 0) && (
-                        <p className="text-sm text-muted-foreground text-center py-4">No system user data</p>
-                      )}
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
-
-              {/* USB Status Distribution */}
-              <Card>
-                <CardHeader>
-                  <CardTitle className="text-lg flex items-center gap-2">
-                    <Usb className="h-5 w-5" />
-                    USB Access Status
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  {loadingHealth ? (
-                    <div className="flex items-center justify-center py-8">
-                      <Loader2 className="h-6 w-6 animate-spin" />
-                    </div>
-                  ) : (
-                    <div className="space-y-4">
-                      <div className="flex items-center justify-between p-4 rounded-lg bg-emerald-50 dark:bg-emerald-950">
-                        <div className="flex items-center gap-3">
-                          <div className="p-2 bg-emerald-100 dark:bg-emerald-900 rounded-full">
-                            <Check className="h-5 w-5 text-emerald-600" />
-                          </div>
-                          <div>
-                            <p className="font-medium">USB Enabled</p>
-                            <p className="text-sm text-muted-foreground">Full access granted</p>
-                          </div>
-                        </div>
-                        <span className="text-2xl font-bold text-emerald-600">
-                          {healthReport?.usbEnabledSystems || 0}
-                        </span>
-                      </div>
-                      <div className="flex items-center justify-between p-4 rounded-lg bg-rose-50 dark:bg-rose-950">
-                        <div className="flex items-center gap-3">
-                          <div className="p-2 bg-rose-100 dark:bg-rose-900 rounded-full">
-                            <X className="h-5 w-5 text-rose-600" />
-                          </div>
-                          <div>
-                            <p className="font-medium">USB Disabled</p>
-                            <p className="text-sm text-muted-foreground">Access restricted</p>
-                          </div>
-                        </div>
-                        <span className="text-2xl font-bold text-rose-600">
-                          {healthReport?.usbDisabledSystems || 0}
-                        </span>
-                      </div>
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
-            </div>
-
-            {/* Systems with Device Counts */}
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Monitor className="h-5 w-5" />
-                  Systems with Registered Devices
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                {loadingHealth ? (
-                  <div className="flex items-center justify-center py-8">
-                    <Loader2 className="h-6 w-6 animate-spin" />
-                  </div>
-                ) : (
-                  <div className="rounded-md border overflow-auto max-h-[400px]">
-                    <Table>
-                      <TableHeader className="sticky top-0 bg-background">
-                        <TableRow>
-                          <TableHead>PC Name</TableHead>
-                          <TableHead className="text-right">Registered Devices</TableHead>
-                          <TableHead className="text-right">Progress</TableHead>
-                        </TableRow>
-                      </TableHeader>
-                      <TableBody>
-                        {healthReport?.systemsWithDevices.filter(s => s.deviceCount > 0).map((system) => {
-                          const maxDevices = healthReport.systemsWithDevices[0]?.deviceCount || 1;
-                          return (
-                            <TableRow key={system.machineId}>
-                              <TableCell className="font-medium">{system.pcName}</TableCell>
-                              <TableCell className="text-right">{system.deviceCount}</TableCell>
-                              <TableCell className="w-[200px]">
-                                <Progress 
-                                  value={(system.deviceCount / maxDevices) * 100} 
-                                  className="h-2" 
-                                />
-                              </TableCell>
-                            </TableRow>
-                          );
-                        })}
-                        {(!healthReport?.systemsWithDevices || healthReport.systemsWithDevices.filter(s => s.deviceCount > 0).length === 0) && (
-                          <TableRow>
-                            <TableCell colSpan={3} className="text-center py-8 text-muted-foreground">
-                              No systems with registered devices
-                            </TableCell>
-                          </TableRow>
-                        )}
-                      </TableBody>
-                    </Table>
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-
-            {/* Inactive Systems Alert */}
-            {healthReport?.inactiveSystems && healthReport.inactiveSystems.length > 0 && (
-              <Card className="border-amber-200 dark:border-amber-800">
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2 text-amber-600">
-                    <WifiOff className="h-5 w-5" />
-                    Inactive Systems (7+ days offline)
-                  </CardTitle>
-                  <CardDescription>
-                    These systems have not connected in over a week
-                  </CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <div className="rounded-md border overflow-auto">
-                    <Table>
-                      <TableHeader>
-                        <TableRow>
-                          <TableHead>PC Name</TableHead>
-                          <TableHead>MAC ID</TableHead>
-                          <TableHead>Last Connected</TableHead>
-                          <TableHead>Remark</TableHead>
-                        </TableRow>
-                      </TableHeader>
-                      <TableBody>
-                        {healthReport.inactiveSystems.map((system) => (
-                          <TableRow key={system.machineId}>
-                            <TableCell className="font-medium">{system.pcName}</TableCell>
-                            <TableCell>
-                              <code className="text-xs bg-muted px-2 py-1 rounded">{system.macId}</code>
-                            </TableCell>
-                            <TableCell>
-                              {system.lastConnected 
-                                ? formatDistanceToNow(new Date(system.lastConnected), { addSuffix: true })
-                                : 'Never'}
-                            </TableCell>
-                            <TableCell>{system.remark || '-'}</TableCell>
-                          </TableRow>
-                        ))}
-                      </TableBody>
-                    </Table>
-                  </div>
-                </CardContent>
-              </Card>
             )}
           </TabsContent>
         </Tabs>

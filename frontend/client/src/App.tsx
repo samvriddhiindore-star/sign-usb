@@ -45,7 +45,8 @@ function Router() {
       <Route path="/reports" component={ReportsPage} />
       <Route path="/logs" component={LogsPage} />
       <Route path="/notifications" component={NotificationsPage} />
-      <Route path="/duplicate-macids" component={DuplicateMacIdsPage} />
+      {/* Duplicate MAC IDs page removed - duplicates are now automatically merged */}
+      {/* <Route path="/duplicate-macids" component={DuplicateMacIdsPage} /> */}
       <Route path="/settings" component={SettingsPage} />
       
       {/* Help Pages */}

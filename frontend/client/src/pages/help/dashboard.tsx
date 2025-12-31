@@ -71,7 +71,7 @@ export default function DashboardHelp() {
               <div className="flex items-start gap-3 p-3 border rounded-lg">
                 <HardDrive className="h-5 w-5 text-purple-500 mt-0.5" />
                 <div>
-                  <h4 className="font-semibold text-sm">Total Devices</h4>
+                  <h4 className="font-semibold text-sm">Total USB Devices</h4>
                   <p className="text-xs text-muted-foreground">Total number of USB devices registered across all systems</p>
                 </div>
               </div>
@@ -114,6 +114,9 @@ export default function DashboardHelp() {
     </Layout>
   );
 }
+
+
+
 
 
 

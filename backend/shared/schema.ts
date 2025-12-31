@@ -39,7 +39,10 @@ export const clientMaster = mysqlTable("client_master", {
   usbStatus: tinyint("usb_status").default(0), // 0 = disabled, 1 = enabled
   machineOn: tinyint("machine_on").default(0), // 0 = offline, 1 = online
   lastConnected: datetime("last_connected"),
-  timeOffset: int("time_offset"), // Time offset in milliseconds: server_time - client_time (stored in DB as server time)
+  timeOffset: int("time_offset"), // Time offset in milliseconds: server_time - client_time
+  clientStatus: tinyint("client_status").default(0), // 0 = offline, 1 = online (temporary flag)
+  clientStatusUpdatedAt: datetime("client_status_updated_at"), // Timestamp when client_status was set to 1 (online)
+  lastUpdated: datetime("last_updated"), // Server-side timestamp for accurate online/offline detection
   remark: varchar("remark", { length: 255 }),
   createdAt: timestamp("created_at", { mode: "date" }).default(sql`CURRENT_TIMESTAMP`),
   systemUserId: int("profile_id").references(() => systemUsers.systemUserId, { onDelete: "set null" }),

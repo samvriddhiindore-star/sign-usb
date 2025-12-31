@@ -3,13 +3,14 @@ import {
   LayoutDashboard, Monitor, Usb, Users, Globe, 
   ScrollText, Settings as SettingsIcon, LogOut, Menu,
   Shield, UserCog, BarChart3, HelpCircle, ChevronDown, ChevronRight,
-  Bell, AlertTriangle
+  Bell, AlertTriangle, RefreshCw
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useState, useEffect } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { api } from "@/lib/api";
 import { Badge } from "@/components/ui/badge";
+import { useToast } from "@/hooks/use-toast";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -45,9 +46,33 @@ export default function Layout({ children }: { children: React.ReactNode }) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const isHelpActive = location.startsWith('/help');
   const [helpMenuOpen, setHelpMenuOpen] = useState(isHelpActive);
+  const queryClient = useQueryClient();
+  const { toast } = useToast();
   
   // Get user info from localStorage
   const [userInfo, setUserInfo] = useState<{ name: string; email: string; role: string } | null>(null);
+
+  // Sync duplicate MAC IDs mutation
+  const syncDuplicatesMutation = useMutation({
+    mutationFn: api.syncDuplicateMacIds,
+    onSuccess: (data) => {
+      toast({
+        title: "Sync Complete",
+        description: data.message || `Successfully merged ${data.merged} duplicate system(s)`,
+      });
+      // Invalidate relevant queries to refresh data
+      queryClient.invalidateQueries({ queryKey: ['systems'] });
+      queryClient.invalidateQueries({ queryKey: ['duplicate-macids'] });
+      queryClient.invalidateQueries({ queryKey: ['dashboard-stats'] });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Sync Failed",
+        description: error.message || "Failed to sync duplicate MAC IDs",
+        variant: "destructive",
+      });
+    },
+  });
 
   useEffect(() => {
     if (isHelpActive) {
@@ -72,7 +97,8 @@ export default function Layout({ children }: { children: React.ReactNode }) {
     { href: "/reports", label: "Reports", icon: BarChart3 },
     { href: "/system-users", label: "System Users", icon: Users },
     { href: "/web-access-control", label: "Website Control", icon: Globe },
-    { href: "/duplicate-macids", label: "Duplicate MAC IDs", icon: AlertTriangle },
+    // Duplicate MAC IDs page removed - duplicates are now automatically merged
+    // { href: "/duplicate-macids", label: "Duplicate MAC IDs", icon: AlertTriangle },
   ];
 
   const helpMenuItems = [
@@ -206,8 +232,22 @@ export default function Layout({ children }: { children: React.ReactNode }) {
             <span className="font-semibold">SIGN - USB</span>
           </div>
           
-          {/* Right side - Notifications and User account */}
+          {/* Right side - Sync, Notifications and User account */}
           <div className="ml-auto flex items-center gap-3">
+            {/* Sync Button */}
+            <button
+              onClick={() => syncDuplicatesMutation.mutate()}
+              disabled={syncDuplicatesMutation.isPending}
+              className="relative p-2 rounded-full hover:bg-accent transition-colors focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed"
+              title="Sync and merge duplicate MAC IDs"
+            >
+              {syncDuplicatesMutation.isPending ? (
+                <RefreshCw className="h-5 w-5 text-muted-foreground animate-spin" />
+              ) : (
+                <RefreshCw className="h-5 w-5 text-muted-foreground" />
+              )}
+            </button>
+
             {/* Notifications Bell */}
             <Link href="/notifications">
               <button className="relative p-2 rounded-full hover:bg-accent transition-colors focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2">

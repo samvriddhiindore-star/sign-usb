@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
-import { 
-  Shield, Activity, Lock, Unlock, WifiOff, Wifi, 
+import {
+  Shield, Activity, Lock, Unlock, WifiOff, Wifi,
   Usb, Calendar, MonitorCheck, TrendingUp,
   CheckCircle2, XCircle
 } from "lucide-react";
@@ -25,7 +25,7 @@ function AnimatedCounter({ value, duration = 2000 }: { value: number; duration?:
     const animate = (currentTime: number) => {
       if (!startTime) startTime = currentTime;
       const progress = Math.min((currentTime - startTime) / duration, 1);
-      
+
       // Easing function for smooth animation
       const easeOutQuart = 1 - Math.pow(1 - progress, 4);
       setDisplayValue(Math.floor(value * easeOutQuart));
@@ -45,14 +45,14 @@ function AnimatedCounter({ value, duration = 2000 }: { value: number; duration?:
 }
 
 // Progress Ring Component
-function ProgressRing({ 
-  percentage, 
-  size = 60, 
+function ProgressRing({
+  percentage,
+  size = 60,
   strokeWidth = 6,
   color = "text-primary"
-}: { 
-  percentage: number; 
-  size?: number; 
+}: {
+  percentage: number;
+  size?: number;
   strokeWidth?: number;
   color?: string;
 }) {
@@ -197,7 +197,7 @@ function KPICard({
         <div className={`absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-500 ${colors.accent}`}>
           <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_50%,rgba(255,255,255,0.1),transparent_50%)]" />
         </div>
-        
+
         <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3 relative z-10">
           <CardTitle className="text-sm font-medium text-foreground/80">{title}</CardTitle>
           <motion.div
@@ -208,11 +208,11 @@ function KPICard({
             <Icon className={`h-5 w-5 ${colors.icon}`} />
           </motion.div>
         </CardHeader>
-        
+
         <CardContent className="relative z-10">
           <div className="flex items-center justify-between gap-4 min-h-[120px]">
             <div className="flex-1 min-w-0">
-              <motion.div 
+              <motion.div
                 className={`text-4xl font-bold ${colors.value} mb-2`}
                 initial={{ scale: 0.8 }}
                 animate={{ scale: 1 }}
@@ -231,12 +231,12 @@ function KPICard({
                 </div>
               )}
             </div>
-            
+
             {percentage !== undefined ? (
               <div className="flex-shrink-0">
-                <ProgressRing 
-                  percentage={percentage} 
-                  size={70} 
+                <ProgressRing
+                  percentage={percentage}
+                  size={70}
                   strokeWidth={6}
                   color={colors.icon}
                 />
@@ -250,7 +250,7 @@ function KPICard({
             )}
           </div>
         </CardContent>
-        
+
         {/* Decorative corner accent */}
         <div className={`absolute top-0 right-0 w-20 h-20 ${colors.accent} opacity-20 rounded-bl-full blur-2xl`} />
       </Card>
@@ -278,33 +278,33 @@ export default function DashboardPage() {
   });
 
   // Calculate percentages and trends
-  const onlinePercentage = stats?.totalSystems 
-    ? Math.round((stats.onlineSystems / stats.totalSystems) * 100) 
+  const onlinePercentage = stats?.totalSystems
+    ? Math.round((stats.onlineSystems / stats.totalSystems) * 100)
     : 0;
-  
-  const usbDisabledPercentage = stats?.totalSystems 
-    ? Math.round((stats.usbDisabledSystems / stats.totalSystems) * 100) 
+
+  const usbDisabledPercentage = stats?.totalSystems
+    ? Math.round((stats.usbDisabledSystems / stats.totalSystems) * 100)
     : 0;
 
   if (statsLoading) {
-  return (
-    <Layout>
-      <div className="space-y-8">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight">Dashboard</h1>
+    return (
+      <Layout>
+        <div className="space-y-8">
+          <div>
+            <h1 className="text-3xl font-bold tracking-tight">Dashboard</h1>
             <p className="text-muted-foreground mt-1">Loading your security overview...</p>
-        </div>
+          </div>
           <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
             {[...Array(9)].map((_, i) => (
               <Card key={i}>
                 <CardHeader className="pb-2">
                   <Skeleton className="h-4 w-24" />
-            </CardHeader>
-            <CardContent>
+                </CardHeader>
+                <CardContent>
                   <Skeleton className="h-8 w-16 mb-2" />
                   <Skeleton className="h-3 w-32" />
-            </CardContent>
-          </Card>
+                </CardContent>
+              </Card>
             ))}
           </div>
         </div>
@@ -332,7 +332,7 @@ export default function DashboardPage() {
             </div>
             <motion.div
               className="hidden md:flex items-center gap-2 px-4 py-2 rounded-lg bg-primary/10 border border-primary/20"
-              animate={{ 
+              animate={{
                 boxShadow: [
                   "0 0 0px rgba(59, 130, 246, 0)",
                   "0 0 20px rgba(59, 130, 246, 0.3)",
@@ -357,7 +357,7 @@ export default function DashboardPage() {
             color="primary"
             delay={0.1}
           />
-          
+
           <KPICard
             title="Online Systems"
             value={stats?.onlineSystems || 0}
@@ -367,7 +367,7 @@ export default function DashboardPage() {
             percentage={onlinePercentage}
             delay={0.2}
           />
-          
+
           <KPICard
             title="Offline Systems"
             value={stats?.offlineSystems || 0}
@@ -377,7 +377,7 @@ export default function DashboardPage() {
             percentage={stats?.totalSystems ? Math.round((stats.offlineSystems / stats.totalSystems) * 100) : 0}
             delay={0.3}
           />
-          
+
           <KPICard
             title="Active USB Devices"
             value={connectedDevices?.length || 0}
@@ -386,7 +386,7 @@ export default function DashboardPage() {
             color="orange"
             delay={0.4}
           />
-          
+
           <KPICard
             title="USB Enabled"
             value={stats?.usbEnabledSystems || 0}
@@ -396,7 +396,7 @@ export default function DashboardPage() {
             percentage={stats?.totalSystems ? Math.round((stats.usbEnabledSystems / stats.totalSystems) * 100) : 0}
             delay={0.5}
           />
-          
+
           <KPICard
             title="USB Disabled"
             value={stats?.usbDisabledSystems || 0}
@@ -406,7 +406,7 @@ export default function DashboardPage() {
             percentage={usbDisabledPercentage}
             delay={0.6}
           />
-          
+
           <KPICard
             title="USB Events Today"
             value={stats?.usbEventsToday || 0}
@@ -415,7 +415,7 @@ export default function DashboardPage() {
             color="indigo"
             delay={0.7}
           />
-          
+
           <KPICard
             title="USB Events (7 Days)"
             value={stats?.usbEventsLast7Days || 0}
@@ -464,16 +464,14 @@ export default function DashboardPage() {
                         className="flex items-center gap-4 p-3 rounded-lg bg-muted/30 hover:bg-muted/60 transition-all group border border-transparent hover:border-primary/20"
                       >
                         <motion.div
-                          className={`h-12 w-12 rounded-xl flex items-center justify-center shadow-sm ${
-                            log.status === 'Connected' 
-                              ? 'bg-gradient-to-br from-emerald-500/20 to-emerald-600/10 border border-emerald-500/30' 
+                          className={`h-12 w-12 rounded-xl flex items-center justify-center shadow-sm ${log.status === 'Connected'
+                              ? 'bg-gradient-to-br from-emerald-500/20 to-emerald-600/10 border border-emerald-500/30'
                               : 'bg-gradient-to-br from-slate-500/20 to-slate-600/10 border border-slate-500/30'
-                          }`}
+                            }`}
                           whileHover={{ scale: 1.1, rotate: 5 }}
                         >
-                          <Usb className={`h-6 w-6 ${
-                            log.status === 'Connected' ? 'text-emerald-600 dark:text-emerald-400' : 'text-slate-500'
-                          }`} />
+                          <Usb className={`h-6 w-6 ${log.status === 'Connected' ? 'text-emerald-600 dark:text-emerald-400' : 'text-slate-500'
+                            }`} />
                         </motion.div>
                         <div className="flex-1 min-w-0">
                           <p className="text-sm font-semibold truncate group-hover:text-primary transition-colors">
@@ -486,8 +484,8 @@ export default function DashboardPage() {
                           </p>
                         </div>
                         <div className="text-right">
-                          <Badge 
-                            variant={log.status === 'Connected' ? 'default' : 'secondary'} 
+                          <Badge
+                            variant={log.status === 'Connected' ? 'default' : 'secondary'}
                             className="mb-1 shadow-sm"
                           >
                             {log.status === 'Connected' ? (
@@ -513,11 +511,11 @@ export default function DashboardPage() {
                       <p className="text-sm">No recent USB activity</p>
                     </div>
                   )}
-              </div>
-            </CardContent>
-          </Card>
+                </div>
+              </CardContent>
+            </Card>
           </motion.div>
-          
+
           {/* Currently Connected Devices */}
           <motion.div
             initial={{ opacity: 0, x: 20 }}
@@ -530,7 +528,7 @@ export default function DashboardPage() {
                 <div className="flex items-center gap-3">
                   <motion.div
                     className="p-2 rounded-lg bg-emerald-500/20"
-                    animate={{ 
+                    animate={{
                       boxShadow: [
                         "0 0 0px rgba(16, 185, 129, 0)",
                         "0 0 15px rgba(16, 185, 129, 0.4)",
@@ -546,7 +544,7 @@ export default function DashboardPage() {
                     <CardDescription>USB devices currently active</CardDescription>
                   </div>
                 </div>
-            </CardHeader>
+              </CardHeader>
               <CardContent className="pt-6">
                 <div className="space-y-3">
                   {connectedDevices && connectedDevices.length > 0 ? (
@@ -561,7 +559,7 @@ export default function DashboardPage() {
                         <div className="flex items-center gap-3">
                           <motion.div
                             className="h-3 w-3 rounded-full bg-emerald-500 shadow-lg shadow-emerald-500/50"
-                            animate={{ 
+                            animate={{
                               scale: [1, 1.2, 1],
                               opacity: [1, 0.7, 1]
                             }}
@@ -589,7 +587,7 @@ export default function DashboardPage() {
                       >
                         <Shield className="h-12 w-12 mx-auto mb-3 opacity-20" />
                       </motion.div>
-                      <p className="text-sm">No devices connected</p>
+                      <p className="text-sm">No USB devices connected</p>
                       <p className="text-xs mt-1">All systems secure</p>
                     </div>
                   )}
@@ -619,7 +617,7 @@ export default function DashboardPage() {
                     </p>
                   </div>
                 </div>
-                
+
                 <div className="flex items-center gap-4">
                   <div className="p-3 rounded-xl bg-primary/20 border border-primary/30">
                     <TrendingUp className="h-6 w-6 text-primary" />
@@ -631,7 +629,7 @@ export default function DashboardPage() {
                     </p>
                   </div>
                 </div>
-                
+
                 <div className="flex items-center gap-4">
                   <div className="p-3 rounded-xl bg-indigo-500/20 border border-indigo-500/30">
                     <Activity className="h-6 w-6 text-indigo-600 dark:text-indigo-400" />

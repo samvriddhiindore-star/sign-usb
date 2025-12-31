@@ -441,13 +441,13 @@ export default function SystemUsersPage() {
                                     </TableCell>
                                     <TableCell>
                                       <Badge 
-                                        variant={(machine.status || (machine.machineOn === 1 ? 'online' : 'offline')) === 'online' ? "default" : "secondary"}
-                                        className={(machine.status || (machine.machineOn === 1 ? 'online' : 'offline')) === 'online' 
+                                        variant={(machine.status || 'offline') === 'online' ? "default" : "secondary"}
+                                        className={(machine.status || 'offline') === 'online' 
                                           ? "bg-emerald-100 text-emerald-800 dark:bg-emerald-900 dark:text-emerald-100" 
                                           : ""
                                         }
                                       >
-                                        {(machine.status || (machine.machineOn === 1 ? 'online' : 'offline')) === 'online' ? (
+                                        {(machine.status || 'offline') === 'online' ? (
                                           <><Wifi className="h-3 w-3 mr-1" /> Online</>
                                         ) : (
                                           <><WifiOff className="h-3 w-3 mr-1" /> Offline</>

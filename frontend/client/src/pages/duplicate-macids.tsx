@@ -4,8 +4,8 @@ import Layout from "@/components/Layout";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { 
-  AlertTriangle, Merge, Monitor, Users, 
+import {
+  AlertTriangle, Merge, Monitor, Users,
   Loader2, RefreshCw, CheckCircle2, XCircle
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
@@ -47,7 +47,7 @@ export default function DuplicateMacIdsPage() {
     queryFn: api.getDuplicateMacIds,
     refetchInterval: 30000,
     staleTime: 0, // Always consider data stale
-    cacheTime: 0, // Don't cache
+    gcTime: 0, // Don't cache
   });
 
   // Debug logging
@@ -73,16 +73,16 @@ export default function DuplicateMacIdsPage() {
       setMergeDialogOpen(false);
       setSelectedDuplicate(null);
       setKeepMachineId(null);
-      toast({ 
-        title: "Success", 
-        description: data.message 
+      toast({
+        title: "Success",
+        description: data.message
       });
     },
     onError: (error: any) => {
-      toast({ 
-        title: "Merge failed", 
+      toast({
+        title: "Merge failed",
         description: error.message || "Failed to merge duplicate systems",
-        variant: "destructive" 
+        variant: "destructive"
       });
     }
   });
@@ -96,16 +96,16 @@ export default function DuplicateMacIdsPage() {
 
   const confirmMerge = () => {
     if (!selectedDuplicate || !keepMachineId) return;
-    
+
     const mergeMachineIds = selectedDuplicate.systems
       .filter(s => s.machineId !== keepMachineId)
       .map(s => s.machineId);
-    
+
     if (mergeMachineIds.length === 0) {
-      toast({ 
-        title: "No systems to merge", 
+      toast({
+        title: "No systems to merge",
         description: "Please select a different system to keep",
-        variant: "destructive" 
+        variant: "destructive"
       });
       return;
     }
@@ -142,8 +142,8 @@ export default function DuplicateMacIdsPage() {
           <AlertTriangle className="h-4 w-4" />
           <AlertTitle>About Duplicate MAC IDs</AlertTitle>
           <AlertDescription>
-            When multiple systems share the same MAC ID, you can merge them into one system. 
-            All devices, USB logs, and notifications from merged systems will be transferred to the kept system.
+            When multiple systems share the same MAC ID, you can merge them into one system.
+            All USB devices, USB logs, and notifications from merged systems will be transferred to the kept system.
           </AlertDescription>
         </Alert>
 
@@ -258,24 +258,23 @@ export default function DuplicateMacIdsPage() {
                 Select which system to keep. All other systems will be merged into it.
               </DialogDescription>
             </DialogHeader>
-            
+
             {selectedDuplicate && (
               <div className="space-y-4 py-4">
                 <div className="p-3 rounded-lg bg-muted">
                   <p className="text-sm font-medium mb-2">MAC ID:</p>
                   <code className="text-sm font-mono">{selectedDuplicate.macId}</code>
                 </div>
-                
+
                 <div className="space-y-2">
                   <p className="text-sm font-medium">Select system to keep:</p>
                   {selectedDuplicate.systems.map((system) => (
                     <label
                       key={system.machineId}
-                      className={`flex items-start gap-3 p-3 rounded-lg border cursor-pointer transition-colors ${
-                        keepMachineId === system.machineId
-                          ? 'border-primary bg-primary/5'
-                          : 'border-border hover:bg-muted/50'
-                      }`}
+                      className={`flex items-start gap-3 p-3 rounded-lg border cursor-pointer transition-colors ${keepMachineId === system.machineId
+                        ? 'border-primary bg-primary/5'
+                        : 'border-border hover:bg-muted/50'
+                        }`}
                     >
                       <input
                         type="radio"
@@ -311,7 +310,7 @@ export default function DuplicateMacIdsPage() {
                       .filter(s => s.machineId !== keepMachineId)
                       .map(s => s.pcName)
                       .join(', ')} will be merged into {selectedDuplicate.systems.find(s => s.machineId === keepMachineId)?.pcName}.
-                    All devices, USB logs, and notifications will be transferred.
+                    All USB devices, USB logs, and notifications will be transferred.
                   </AlertDescription>
                 </Alert>
               </div>

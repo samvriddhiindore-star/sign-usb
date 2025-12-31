@@ -5,6 +5,7 @@ import express, { type Request, Response, NextFunction } from "express";
 import { registerRoutes } from "./routes";
 import { serveStatic } from "./static";
 import { createServer } from "http";
+import { startClientStatusResetJob, startDuplicateMergeJob, startSetAllMachinesOfflineJob } from "./storage";
 
 const app = express();
 const httpServer = createServer(app);
@@ -91,4 +92,13 @@ app.use((req, res, next) => {
   httpServer.listen(port, "0.0.0.0", () => {
     log(`serving on port ${port}`);
   });
+
+  // Start the background job to reset client_status from 1 to 0 after 1 minute
+  startClientStatusResetJob();
+  
+  // Start the background job to automatically merge duplicate MAC IDs
+  startDuplicateMergeJob();
+  
+  // Start the background job to set all machines to offline every 5 minutes
+  startSetAllMachinesOfflineJob();
 })();

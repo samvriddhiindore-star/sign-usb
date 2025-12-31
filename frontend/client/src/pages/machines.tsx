@@ -8,9 +8,9 @@ import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
-import { 
-  Table, TableBody, TableCell, TableHead, 
-  TableHeader, TableRow 
+import {
+  Table, TableBody, TableCell, TableHead,
+  TableHeader, TableRow
 } from "@/components/ui/table";
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem,
@@ -24,10 +24,10 @@ import {
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue
 } from "@/components/ui/select";
-import { 
-  Monitor, Wifi, WifiOff, Usb, Lock, Unlock, 
-  Search, MoreHorizontal, RefreshCw, Eye,
-  Users, Loader2, UserPlus
+import {
+  Monitor, Wifi, WifiOff, Usb, Lock, Unlock,
+  Search, MoreHorizontal, Eye,
+  Users, Loader2, UserPlus, AlertTriangle
 } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 import { useToast } from "@/hooks/use-toast";
@@ -41,16 +41,16 @@ export default function MachinesPage() {
   const [systemUserFilter, setSystemUserFilter] = useState<string>('all');
   const [assignDialogOpen, setAssignDialogOpen] = useState(false);
   const [selectedSystemUserId, setSelectedSystemUserId] = useState<string>('');
-  
+
   const queryClient = useQueryClient();
   const { toast } = useToast();
 
-  const { data: systems, isLoading, refetch } = useQuery({
+  const { data: systems, isLoading } = useQuery({
     queryKey: ['systems'],
     queryFn: api.getSystems,
     refetchInterval: 15000,
     staleTime: 0, // Always consider data stale to force refetch
-    cacheTime: 0 // Don't cache data
+    gcTime: 0 // Don't cache data
   });
 
   const { data: systemUsers } = useQuery({
@@ -127,15 +127,15 @@ export default function MachinesPage() {
 
   // Filter systems
   const filteredSystems = systems?.filter(system => {
-    const matchesSearch = 
+    const matchesSearch =
       system.pcName.toLowerCase().includes(searchTerm.toLowerCase()) ||
       system.macId.toLowerCase().includes(searchTerm.toLowerCase());
-    
-    const matchesStatus = 
-      statusFilter === 'all' || 
+
+    const matchesStatus =
+      statusFilter === 'all' ||
       (statusFilter === 'online' && system.status === 'online') ||
       (statusFilter === 'offline' && system.status === 'offline');
-    
+
     // Debug logging for offline systems
     if (statusFilter === 'offline' && system.status === 'offline') {
       console.log(`[FRONTEND DEBUG] Offline system found:`, {
@@ -146,20 +146,20 @@ export default function MachinesPage() {
         lastConnected: system.lastConnected
       });
     }
-    
-    const matchesUsb = 
+
+    const matchesUsb =
       usbFilter === 'all' ||
       (usbFilter === 'enabled' && system.usbStatus === 1) ||
       (usbFilter === 'disabled' && system.usbStatus === 0);
-    
+
     const matchesSystemUser =
       systemUserFilter === 'all' ||
       (systemUserFilter === 'none' && !system.systemUserId) ||
       (system.systemUserId?.toString() === systemUserFilter);
-    
+
     return matchesSearch && matchesStatus && matchesUsb && matchesSystemUser;
   }) || [];
-  
+
   // Debug: Log all systems with their status
   if (systems && systems.length > 0) {
     const offlineCount = systems.filter(s => s.status === 'offline').length;
@@ -176,7 +176,7 @@ export default function MachinesPage() {
   };
 
   const toggleSelect = (id: number) => {
-    setSelectedIds(prev => 
+    setSelectedIds(prev =>
       prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]
     );
   };
@@ -215,10 +215,6 @@ export default function MachinesPage() {
                 </Button>
               </Link>
             )}
-            <Button onClick={() => refetch()} variant="outline" size="sm">
-              <RefreshCw className="h-4 w-4 mr-2" />
-              Refresh
-            </Button>
           </div>
         </div>
 
@@ -279,8 +275,8 @@ export default function MachinesPage() {
                   {selectedIds.length} system{selectedIds.length > 1 ? 's' : ''} selected
                 </span>
                 <div className="flex gap-2 flex-wrap">
-                  <Button 
-                    size="sm" 
+                  <Button
+                    size="sm"
                     variant="outline"
                     onClick={handleBulkEnable}
                     disabled={bulkUpdateMutation.isPending}
@@ -288,8 +284,8 @@ export default function MachinesPage() {
                     <Unlock className="h-4 w-4 mr-1" />
                     Enable USB
                   </Button>
-                  <Button 
-                    size="sm" 
+                  <Button
+                    size="sm"
                     variant="outline"
                     onClick={handleBulkDisable}
                     disabled={bulkUpdateMutation.isPending}
@@ -297,16 +293,16 @@ export default function MachinesPage() {
                     <Lock className="h-4 w-4 mr-1" />
                     Disable USB
                   </Button>
-                  <Button 
-                    size="sm" 
+                  <Button
+                    size="sm"
                     variant="outline"
                     onClick={() => setAssignDialogOpen(true)}
                   >
                     <UserPlus className="h-4 w-4 mr-1" />
                     Assign SystemUser
                   </Button>
-                  <Button 
-                    size="sm" 
+                  <Button
+                    size="sm"
                     variant="ghost"
                     onClick={() => setSelectedIds([])}
                   >
@@ -378,8 +374,8 @@ export default function MachinesPage() {
                             </code>
                             {duplicateMacIdMap.has(system.macId) && duplicateMacIdMap.get(system.macId)! > 1 && (
                               <Link href="/duplicate-macids">
-                                <Badge 
-                                  variant="destructive" 
+                                <Badge
+                                  variant="destructive"
                                   className="cursor-pointer hover:bg-destructive/90 text-xs"
                                   title={`${duplicateMacIdMap.get(system.macId)} systems share this MAC ID`}
                                 >
@@ -401,10 +397,10 @@ export default function MachinesPage() {
                           )}
                         </TableCell>
                         <TableCell>
-                          <Badge 
+                          <Badge
                             variant={system.status === 'online' ? "default" : "secondary"}
-                            className={system.status === 'online' 
-                              ? "bg-emerald-100 text-emerald-800 dark:bg-emerald-900 dark:text-emerald-100" 
+                            className={system.status === 'online'
+                              ? "bg-emerald-100 text-emerald-800 dark:bg-emerald-900 dark:text-emerald-100"
                               : ""
                             }
                           >
@@ -416,10 +412,10 @@ export default function MachinesPage() {
                           </Badge>
                         </TableCell>
                         <TableCell>
-                          <Badge 
+                          <Badge
                             variant={system.usbStatus === 1 ? "outline" : "destructive"}
-                            className={system.usbStatus === 1 
-                              ? "border-sky-500 text-sky-700 dark:text-sky-400" 
+                            className={system.usbStatus === 1
+                              ? "border-sky-500 text-sky-700 dark:text-sky-400"
                               : ""
                             }
                           >
@@ -455,9 +451,9 @@ export default function MachinesPage() {
                               </DropdownMenuItem>
                               <DropdownMenuSeparator />
                               <DropdownMenuItem
-                                onClick={() => updateUsbMutation.mutate({ 
-                                  machineId: system.machineId, 
-                                  enabled: true 
+                                onClick={() => updateUsbMutation.mutate({
+                                  machineId: system.machineId,
+                                  enabled: true
                                 })}
                                 disabled={system.usbStatus === 1}
                               >
@@ -465,9 +461,9 @@ export default function MachinesPage() {
                                 Enable USB
                               </DropdownMenuItem>
                               <DropdownMenuItem
-                                onClick={() => updateUsbMutation.mutate({ 
-                                  machineId: system.machineId, 
-                                  enabled: false 
+                                onClick={() => updateUsbMutation.mutate({
+                                  machineId: system.machineId,
+                                  enabled: false
                                 })}
                                 disabled={system.usbStatus === 0}
                               >
@@ -545,7 +541,7 @@ export default function MachinesPage() {
               <Button variant="outline" onClick={() => setAssignDialogOpen(false)}>
                 Cancel
               </Button>
-              <Button 
+              <Button
                 onClick={handleBulkAssignSystemUser}
                 disabled={bulkAssignSystemUserMutation.isPending || !selectedSystemUserId}
               >
