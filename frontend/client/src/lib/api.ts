@@ -215,11 +215,11 @@ export const api = {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ email, password })
     });
-    
+
     if (!response.ok) {
       throw new Error('Login failed');
     }
-    
+
     return response.json();
   },
 
@@ -228,11 +228,11 @@ export const api = {
     const response = await fetch(`${API_BASE}/dashboard/stats`, {
       headers: getAuthHeaders()
     });
-    
+
     if (!response.ok) {
       throw new Error('Failed to fetch dashboard stats');
     }
-    
+
     return response.json();
   },
 
@@ -241,11 +241,11 @@ export const api = {
     const response = await fetch(`${API_BASE}/systems`, {
       headers: getAuthHeaders()
     });
-    
+
     if (!response.ok) {
       throw new Error('Failed to fetch systems');
     }
-    
+
     return response.json();
   },
 
@@ -253,11 +253,11 @@ export const api = {
     const response = await fetch(`${API_BASE}/systems/${id}`, {
       headers: getAuthHeaders()
     });
-    
+
     if (!response.ok) {
       throw new Error('Failed to fetch system');
     }
-    
+
     return response.json();
   },
 
@@ -265,11 +265,11 @@ export const api = {
     const response = await fetch(`${API_BASE}/systems/disconnected?days=${days}`, {
       headers: getAuthHeaders()
     });
-    
+
     if (!response.ok) {
       throw new Error('Failed to fetch disconnected systems');
     }
-    
+
     return response.json();
   },
 
@@ -279,11 +279,11 @@ export const api = {
       headers: getAuthHeaders(),
       body: JSON.stringify({ enabled })
     });
-    
+
     if (!response.ok) {
       throw new Error('Failed to update USB status');
     }
-    
+
     return response.json();
   },
 
@@ -293,11 +293,11 @@ export const api = {
       headers: getAuthHeaders(),
       body: JSON.stringify({ machineIds, enabled })
     });
-    
+
     if (!response.ok) {
       throw new Error('Failed to bulk update USB status');
     }
-    
+
     return response.json();
   },
 
@@ -307,11 +307,11 @@ export const api = {
       headers: getAuthHeaders(),
       body: JSON.stringify({ systemUserId })
     });
-    
+
     if (!response.ok) {
       throw new Error('Failed to assign system user');
     }
-    
+
     return response.json();
   },
 
@@ -321,11 +321,11 @@ export const api = {
       headers: getAuthHeaders(),
       body: JSON.stringify({ machineIds, systemUserId })
     });
-    
+
     if (!response.ok) {
       throw new Error('Failed to bulk assign system user');
     }
-    
+
     return response.json();
   },
 
@@ -334,11 +334,11 @@ export const api = {
     const response = await fetch(`${API_BASE}/usb-logs?limit=${limit}`, {
       headers: getAuthHeaders()
     });
-    
+
     if (!response.ok) {
       throw new Error('Failed to fetch USB logs');
     }
-    
+
     return response.json();
   },
 
@@ -346,11 +346,11 @@ export const api = {
     const response = await fetch(`${API_BASE}/usb-logs/machine/${machineId}?limit=${limit}`, {
       headers: getAuthHeaders()
     });
-    
+
     if (!response.ok) {
       throw new Error('Failed to fetch USB logs');
     }
-    
+
     return response.json();
   },
 
@@ -358,11 +358,11 @@ export const api = {
     const response = await fetch(`${API_BASE}/usb-logs/connected`, {
       headers: getAuthHeaders()
     });
-    
+
     if (!response.ok) {
       throw new Error('Failed to fetch connected USB devices');
     }
-    
+
     return response.json();
   },
 
@@ -371,11 +371,11 @@ export const api = {
     const response = await fetch(`${API_BASE}/system-users`, {
       headers: getAuthHeaders()
     });
-    
+
     if (!response.ok) {
       throw new Error('Failed to fetch system users');
     }
-    
+
     return response.json();
   },
 
@@ -383,11 +383,11 @@ export const api = {
     const response = await fetch(`${API_BASE}/system-users/${id}`, {
       headers: getAuthHeaders()
     });
-    
+
     if (!response.ok) {
       throw new Error('Failed to fetch system user');
     }
-    
+
     return response.json();
   },
 
@@ -398,7 +398,7 @@ export const api = {
       headers: getAuthHeaders(),
       body: JSON.stringify(data)
     });
-    
+
     if (!response.ok) {
       const errorText = await response.text();
       console.error("API: System user creation failed:", response.status, errorText);
@@ -410,7 +410,7 @@ export const api = {
       }
       throw new Error(error.error || `Failed to create system user (${response.status})`);
     }
-    
+
     const result = await response.json();
     console.log("API: System user created successfully:", result);
     return result;
@@ -422,12 +422,12 @@ export const api = {
       headers: getAuthHeaders(),
       body: JSON.stringify(data)
     });
-    
+
     if (!response.ok) {
       const error = await response.json().catch(() => ({ error: 'Failed to update system user' }));
       throw new Error(error.error || 'Failed to update system user');
     }
-    
+
     return response.json();
   },
 
@@ -436,11 +436,11 @@ export const api = {
       method: 'DELETE',
       headers: getAuthHeaders()
     });
-    
+
     if (!response.ok) {
       throw new Error('Failed to delete system user');
     }
-    
+
     return response.json();
   },
 
@@ -449,11 +449,11 @@ export const api = {
       method: 'POST',
       headers: getAuthHeaders()
     });
-    
+
     if (!response.ok) {
       throw new Error('Failed to apply system user policy');
     }
-    
+
     return response.json();
   },
 
@@ -462,11 +462,11 @@ export const api = {
     const response = await fetch(`${API_BASE}/urls`, {
       headers: getAuthHeaders()
     });
-    
+
     if (!response.ok) {
       throw new Error('Failed to fetch URLs');
     }
-    
+
     return response.json();
   },
 
@@ -476,11 +476,11 @@ export const api = {
       headers: getAuthHeaders(),
       body: JSON.stringify(data)
     });
-    
+
     if (!response.ok) {
       throw new Error('Failed to create URL');
     }
-    
+
     return response.json();
   },
 
@@ -490,11 +490,11 @@ export const api = {
       headers: getAuthHeaders(),
       body: JSON.stringify(data)
     });
-    
+
     if (!response.ok) {
       throw new Error('Failed to update URL');
     }
-    
+
     return response.json();
   },
 
@@ -503,11 +503,39 @@ export const api = {
       method: 'DELETE',
       headers: getAuthHeaders()
     });
-    
+
     if (!response.ok) {
       throw new Error('Failed to delete URL');
     }
-    
+
+    return response.json();
+  },
+
+  async createBulkUrls(urls: string[]): Promise<{ success: number; failed: number; errors: string[]; message: string }> {
+    const response = await fetch(`${API_BASE}/urls/bulk`, {
+      method: 'POST',
+      headers: getAuthHeaders(),
+      body: JSON.stringify({ urls })
+    });
+
+    if (!response.ok) {
+      throw new Error('Failed to create bulk URLs');
+    }
+
+    return response.json();
+  },
+
+  async deleteBulkUrls(ids: number[]): Promise<{ success: boolean; deleted: number; message: string }> {
+    const response = await fetch(`${API_BASE}/urls/bulk`, {
+      method: 'DELETE',
+      headers: getAuthHeaders(),
+      body: JSON.stringify({ ids })
+    });
+
+    if (!response.ok) {
+      throw new Error('Failed to delete URLs');
+    }
+
     return response.json();
   },
 
@@ -516,11 +544,11 @@ export const api = {
     const response = await fetch(`${API_BASE}/devices`, {
       headers: getAuthHeaders()
     });
-    
+
     if (!response.ok) {
       throw new Error('Failed to fetch devices');
     }
-    
+
     return response.json();
   },
 
@@ -528,11 +556,11 @@ export const api = {
     const response = await fetch(`${API_BASE}/devices/${id}`, {
       headers: getAuthHeaders()
     });
-    
+
     if (!response.ok) {
       throw new Error('Failed to fetch device');
     }
-    
+
     return response.json();
   },
 
@@ -540,17 +568,17 @@ export const api = {
     const response = await fetch(`${API_BASE}/devices/machine/${machineId}`, {
       headers: getAuthHeaders()
     });
-    
+
     if (!response.ok) {
       throw new Error('Failed to fetch devices');
     }
-    
+
     return response.json();
   },
 
-  async createDevice(data: { 
-    machineId?: number | null; 
-    deviceName: string; 
+  async createDevice(data: {
+    machineId?: number | null;
+    deviceName: string;
     description?: string;
     deviceId?: string;
     deviceManufacturer?: string;
@@ -562,11 +590,11 @@ export const api = {
       headers: getAuthHeaders(),
       body: JSON.stringify(data)
     });
-    
+
     if (!response.ok) {
       throw new Error('Failed to create device');
     }
-    
+
     return response.json();
   },
 
@@ -576,11 +604,11 @@ export const api = {
       headers: getAuthHeaders(),
       body: JSON.stringify(data)
     });
-    
+
     if (!response.ok) {
       throw new Error('Failed to update device');
     }
-    
+
     return response.json();
   },
 
@@ -589,11 +617,11 @@ export const api = {
       method: 'DELETE',
       headers: getAuthHeaders()
     });
-    
+
     if (!response.ok) {
       throw new Error('Failed to delete device');
     }
-    
+
     return response.json();
   },
 
@@ -602,11 +630,11 @@ export const api = {
     const response = await fetch(`${API_BASE}/users`, {
       headers: getAuthHeaders()
     });
-    
+
     if (!response.ok) {
       throw new Error('Failed to fetch users');
     }
-    
+
     return response.json();
   },
 
@@ -614,18 +642,18 @@ export const api = {
     const response = await fetch(`${API_BASE}/users/${id}`, {
       headers: getAuthHeaders()
     });
-    
+
     if (!response.ok) {
       throw new Error('Failed to fetch user');
     }
-    
+
     return response.json();
   },
 
-  async createUser(data: { 
-    name: string; 
-    email: string; 
-    password: string; 
+  async createUser(data: {
+    name: string;
+    email: string;
+    password: string;
     phone?: string;
     role?: 'admin' | 'manager' | 'user' | 'viewer';
     status?: number;
@@ -635,18 +663,18 @@ export const api = {
       headers: getAuthHeaders(),
       body: JSON.stringify(data)
     });
-    
+
     if (!response.ok) {
       const error = await response.json();
       throw new Error(error.error || 'Failed to create user');
     }
-    
+
     return response.json();
   },
 
-  async updateUser(id: number, data: { 
-    name?: string; 
-    email?: string; 
+  async updateUser(id: number, data: {
+    name?: string;
+    email?: string;
     phone?: string | null;
     role?: 'admin' | 'manager' | 'user' | 'viewer';
   }): Promise<User> {
@@ -655,12 +683,12 @@ export const api = {
       headers: getAuthHeaders(),
       body: JSON.stringify(data)
     });
-    
+
     if (!response.ok) {
       const error = await response.json();
       throw new Error(error.error || 'Failed to update user');
     }
-    
+
     return response.json();
   },
 
@@ -670,12 +698,12 @@ export const api = {
       headers: getAuthHeaders(),
       body: JSON.stringify({ status })
     });
-    
+
     if (!response.ok) {
       const error = await response.json();
       throw new Error(error.error || 'Failed to update user status');
     }
-    
+
     return response.json();
   },
 
@@ -685,12 +713,12 @@ export const api = {
       headers: getAuthHeaders(),
       body: JSON.stringify({ newPassword })
     });
-    
+
     if (!response.ok) {
       const error = await response.json();
       throw new Error(error.error || 'Failed to update password');
     }
-    
+
     return response.json();
   },
 
@@ -699,12 +727,12 @@ export const api = {
       method: 'DELETE',
       headers: getAuthHeaders()
     });
-    
+
     if (!response.ok) {
       const error = await response.json();
       throw new Error(error.error || 'Failed to delete user');
     }
-    
+
     return response.json();
   },
 
@@ -713,11 +741,11 @@ export const api = {
     const response = await fetch(`${API_BASE}/reports/devices-by-machine`, {
       headers: getAuthHeaders()
     });
-    
+
     if (!response.ok) {
       throw new Error('Failed to fetch devices by machine report');
     }
-    
+
     return response.json();
   },
 
@@ -725,15 +753,15 @@ export const api = {
     const params = new URLSearchParams();
     if (startDate) params.append('startDate', startDate);
     if (endDate) params.append('endDate', endDate);
-    
+
     const response = await fetch(`${API_BASE}/reports/usb-activity?${params}`, {
       headers: getAuthHeaders()
     });
-    
+
     if (!response.ok) {
       throw new Error('Failed to fetch USB activity report');
     }
-    
+
     return response.json();
   },
 
@@ -741,21 +769,21 @@ export const api = {
     const response = await fetch(`${API_BASE}/reports/system-health`, {
       headers: getAuthHeaders()
     });
-    
+
     if (!response.ok) {
       throw new Error('Failed to fetch system health report');
     }
-    
+
     return response.json();
   },
 
   async getDeviceAnalyticsReport(): Promise<DeviceAnalyticsReport> {
     try {
       const response = await fetch(`${API_BASE}/reports/device-analytics`, {
-      headers: getAuthHeaders()
-    });
-    
-    if (!response.ok) {
+        headers: getAuthHeaders()
+      });
+
+      if (!response.ok) {
         let errorMessage = `HTTP ${response.status}: ${response.statusText}`;
         try {
           const errorData = await response.json();
@@ -770,7 +798,7 @@ export const api = {
         console.error('[API] Device analytics error:', errorMessage);
         throw new Error(`Failed to fetch device analytics report: ${errorMessage}`);
       }
-      
+
       const data = await response.json();
       console.log('[API] Device analytics response:', {
         totalDevices: data.summary?.totalDevices,
@@ -778,13 +806,13 @@ export const api = {
         byMachine: data.byMachine?.length,
         offlineSystems: data.offlineSystems?.length
       });
-      
+
       // Validate response structure
       if (!data.summary) {
         console.error('[API] Invalid device analytics response structure:', data);
         throw new Error('Invalid response format from server');
       }
-      
+
       return data;
     } catch (error: any) {
       console.error('[API] Device analytics fetch failed:', error);
@@ -796,11 +824,11 @@ export const api = {
     const response = await fetch(`${API_BASE}/reports/machine-devices/${machineId}`, {
       headers: getAuthHeaders()
     });
-    
+
     if (!response.ok) {
       throw new Error('Failed to fetch machine device report');
     }
-    
+
     return response.json();
   },
 
@@ -851,7 +879,7 @@ export const api = {
   },
 
   async updatePolicy(
-    machineId: string, 
+    machineId: string,
     policy: { lockAllUsb?: boolean; temporarilyUnlockedUntil?: string | null }
   ): Promise<{ success: boolean }> {
     return this.updateSystemUsb(parseInt(machineId), !policy.lockAllUsb);
@@ -870,15 +898,15 @@ export const api = {
     const params = new URLSearchParams();
     if (limit) params.append('limit', limit.toString());
     if (unreadOnly) params.append('unreadOnly', 'true');
-    
+
     const response = await fetch(`${API_BASE}/notifications?${params}`, {
       headers: getAuthHeaders()
     });
-    
+
     if (!response.ok) {
       throw new Error('Failed to fetch notifications');
     }
-    
+
     return response.json();
   },
 
@@ -886,11 +914,11 @@ export const api = {
     const response = await fetch(`${API_BASE}/notifications/unread-count`, {
       headers: getAuthHeaders()
     });
-    
+
     if (!response.ok) {
       throw new Error('Failed to fetch unread notification count');
     }
-    
+
     const data = await response.json();
     return data.count;
   },
@@ -900,7 +928,7 @@ export const api = {
       method: 'PUT',
       headers: getAuthHeaders()
     });
-    
+
     if (!response.ok) {
       throw new Error('Failed to mark notification as read');
     }
@@ -911,11 +939,11 @@ export const api = {
       method: 'PUT',
       headers: getAuthHeaders()
     });
-    
+
     if (!response.ok) {
       throw new Error('Failed to mark all notifications as read');
     }
-    
+
     const data = await response.json();
     return data.affected;
   },
@@ -926,13 +954,13 @@ export const api = {
     const response = await fetch(`${API_BASE}/systems/duplicates`, {
       headers: getAuthHeaders()
     });
-    
+
     if (!response.ok) {
       const errorText = await response.text();
       console.error('[API] Failed to fetch duplicate MAC IDs:', response.status, errorText);
       throw new Error(`Failed to fetch duplicate MAC IDs: ${response.status} ${errorText}`);
     }
-    
+
     const data = await response.json();
     console.log('[API] Received duplicate MAC IDs:', data);
     return data;
@@ -944,11 +972,11 @@ export const api = {
       headers: getAuthHeaders(),
       body: JSON.stringify({ macId, keepMachineId, mergeMachineIds })
     });
-    
+
     if (!response.ok) {
       throw new Error('Failed to merge duplicate MAC IDs');
     }
-    
+
     return response.json();
   },
 
@@ -957,12 +985,12 @@ export const api = {
       method: 'POST',
       headers: getAuthHeaders()
     });
-    
+
     if (!response.ok) {
       const error = await response.json();
       throw new Error(error.error || 'Failed to sync duplicate MAC IDs');
     }
-    
+
     return response.json();
   },
 };

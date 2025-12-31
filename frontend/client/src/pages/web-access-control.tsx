@@ -7,21 +7,23 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   Dialog, DialogContent, DialogDescription, DialogFooter,
   DialogHeader, DialogTitle, DialogTrigger
 } from "@/components/ui/dialog";
-import { 
-  Table, TableBody, TableCell, TableHead, 
-  TableHeader, TableRow 
+import {
+  Table, TableBody, TableCell, TableHead,
+  TableHeader, TableRow
 } from "@/components/ui/table";
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem,
   DropdownMenuTrigger
 } from "@/components/ui/dropdown-menu";
-import { 
-  Globe, Plus, RefreshCw, MoreHorizontal, 
-  Edit, Trash2, Loader2, Search, Check
+import {
+  Globe, Plus, RefreshCw, MoreHorizontal,
+  Edit, Trash2, Loader2, Search, Check, Upload
 } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 import { useToast } from "@/hooks/use-toast";
@@ -31,7 +33,10 @@ export default function WebAccessControlPage() {
   const [editUrl, setEditUrl] = useState<UrlEntry | null>(null);
   const [formData, setFormData] = useState({ url: '', access: 'allowed' as 'allowed' | 'blocked' });
   const [searchTerm, setSearchTerm] = useState("");
-  
+  const [isBulkOpen, setIsBulkOpen] = useState(false);
+  const [bulkUrls, setBulkUrls] = useState("");
+  const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
+
   const queryClient = useQueryClient();
   const { toast } = useToast();
 
@@ -80,6 +85,36 @@ export default function WebAccessControlPage() {
     }
   });
 
+  const bulkMutation = useMutation({
+    mutationFn: (urls: string[]) => api.createBulkUrls(urls),
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ['urls'] });
+      queryClient.invalidateQueries({ queryKey: ['dashboard-stats'] });
+      setIsBulkOpen(false);
+      setBulkUrls("");
+      toast({
+        title: data.message,
+        description: data.failed > 0 ? `${data.failed} URL(s) failed to add` : undefined
+      });
+    },
+    onError: () => {
+      toast({ title: "Failed to add URLs", variant: "destructive" });
+    }
+  });
+
+  const bulkDeleteMutation = useMutation({
+    mutationFn: (ids: number[]) => api.deleteBulkUrls(ids),
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ['urls'] });
+      queryClient.invalidateQueries({ queryKey: ['dashboard-stats'] });
+      setSelectedIds(new Set());
+      toast({ title: data.message });
+    },
+    onError: () => {
+      toast({ title: "Failed to delete URLs", variant: "destructive" });
+    }
+  });
+
   // Filter URLs - only show allowed URLs
   const filteredUrls = urls?.filter(url => {
     const matchesSearch = url.url.toLowerCase().includes(searchTerm.toLowerCase());
@@ -94,8 +129,8 @@ export default function WebAccessControlPage() {
 
   const handleUpdate = () => {
     if (!editUrl || !formData.url.trim()) return;
-    updateMutation.mutate({ 
-      id: editUrl.id, 
+    updateMutation.mutate({
+      id: editUrl.id,
       data: { url: formData.url, access: 'allowed' }
     });
   };
@@ -103,6 +138,43 @@ export default function WebAccessControlPage() {
   const openEditDialog = (url: UrlEntry) => {
     setFormData({ url: url.url, access: 'allowed' });
     setEditUrl(url);
+  };
+
+  const handleBulkAdd = () => {
+    const urlList = bulkUrls
+      .split('\n')
+      .map(url => url.trim())
+      .filter(url => url.length > 0);
+    if (urlList.length === 0) return;
+    bulkMutation.mutate(urlList);
+  };
+
+  const bulkUrlCount = bulkUrls
+    .split('\n')
+    .map((url: string) => url.trim())
+    .filter((url: string) => url.length > 0).length;
+
+  const toggleSelect = (id: number) => {
+    const newSelected = new Set(selectedIds);
+    if (newSelected.has(id)) {
+      newSelected.delete(id);
+    } else {
+      newSelected.add(id);
+    }
+    setSelectedIds(newSelected);
+  };
+
+  const toggleSelectAll = () => {
+    if (selectedIds.size === filteredUrls.length) {
+      setSelectedIds(new Set());
+    } else {
+      setSelectedIds(new Set(filteredUrls.map(u => u.id)));
+    }
+  };
+
+  const handleBulkDelete = () => {
+    if (selectedIds.size === 0) return;
+    bulkDeleteMutation.mutate(Array.from(selectedIds));
   };
 
   // Stats - only count allowed URLs
@@ -147,12 +219,57 @@ export default function WebAccessControlPage() {
                   <Button variant="outline" onClick={() => setIsCreateOpen(false)}>
                     Cancel
                   </Button>
-                  <Button 
-                    onClick={handleCreate} 
+                  <Button
+                    onClick={handleCreate}
                     disabled={createMutation.isPending || !formData.url.trim()}
                   >
                     {createMutation.isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
                     Add URL
+                  </Button>
+                </DialogFooter>
+              </DialogContent>
+            </Dialog>
+            <Dialog open={isBulkOpen} onOpenChange={setIsBulkOpen}>
+              <DialogTrigger asChild>
+                <Button variant="outline" onClick={() => setBulkUrls('')}>
+                  <Upload className="h-4 w-4 mr-2" />
+                  Bulk Add
+                </Button>
+              </DialogTrigger>
+              <DialogContent className="max-w-md">
+                <DialogHeader>
+                  <DialogTitle>Bulk Add Websites</DialogTitle>
+                  <DialogDescription>
+                    Paste multiple URLs, one per line.
+                  </DialogDescription>
+                </DialogHeader>
+                <div className="space-y-4 py-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="bulk-urls">URLs (one per line)</Label>
+                    <Textarea
+                      id="bulk-urls"
+                      value={bulkUrls}
+                      onChange={(e) => setBulkUrls(e.target.value)}
+                      placeholder={"google.com\nyahoo.com\nbing.com"}
+                      rows={8}
+                    />
+                    {bulkUrlCount > 0 && (
+                      <p className="text-sm text-muted-foreground">
+                        {bulkUrlCount} URL(s) will be added
+                      </p>
+                    )}
+                  </div>
+                </div>
+                <DialogFooter>
+                  <Button variant="outline" onClick={() => setIsBulkOpen(false)}>
+                    Cancel
+                  </Button>
+                  <Button
+                    onClick={handleBulkAdd}
+                    disabled={bulkMutation.isPending || bulkUrlCount === 0}
+                  >
+                    {bulkMutation.isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+                    Add {bulkUrlCount} URL(s)
                   </Button>
                 </DialogFooter>
               </DialogContent>
@@ -210,13 +327,29 @@ export default function WebAccessControlPage() {
         {/* URLs Table */}
         <Card>
           <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Globe className="h-5 w-5" />
-              Allowed Websites ({filteredUrls.length})
-            </CardTitle>
-            <CardDescription>
-              Manage allowed websites.
-            </CardDescription>
+            <div className="flex items-center justify-between">
+              <div>
+                <CardTitle className="flex items-center gap-2">
+                  <Globe className="h-5 w-5" />
+                  Allowed Websites ({filteredUrls.length})
+                </CardTitle>
+                <CardDescription>
+                  Manage allowed websites.
+                </CardDescription>
+              </div>
+              {selectedIds.size > 0 && (
+                <Button
+                  variant="destructive"
+                  size="sm"
+                  onClick={handleBulkDelete}
+                  disabled={bulkDeleteMutation.isPending}
+                >
+                  {bulkDeleteMutation.isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+                  <Trash2 className="h-4 w-4 mr-2" />
+                  Delete Selected ({selectedIds.size})
+                </Button>
+              )}
+            </div>
           </CardHeader>
           <CardContent>
             {isLoading ? (
@@ -234,6 +367,12 @@ export default function WebAccessControlPage() {
                 <Table>
                   <TableHeader>
                     <TableRow>
+                      <TableHead className="w-[50px]">
+                        <Checkbox
+                          checked={selectedIds.size === filteredUrls.length && filteredUrls.length > 0}
+                          onCheckedChange={toggleSelectAll}
+                        />
+                      </TableHead>
                       <TableHead>URL</TableHead>
                       <TableHead>Access</TableHead>
                       <TableHead>Created</TableHead>
@@ -244,13 +383,19 @@ export default function WebAccessControlPage() {
                     {filteredUrls.map((url) => (
                       <TableRow key={url.id} className="hover:bg-muted/50">
                         <TableCell>
+                          <Checkbox
+                            checked={selectedIds.has(url.id)}
+                            onCheckedChange={() => toggleSelect(url.id)}
+                          />
+                        </TableCell>
+                        <TableCell>
                           <div className="flex items-center gap-2">
                             <Globe className="h-4 w-4 text-emerald-500" />
                             <span className="font-medium">{url.url}</span>
                           </div>
                         </TableCell>
                         <TableCell>
-                          <Badge 
+                          <Badge
                             variant="default"
                             className="bg-emerald-100 text-emerald-800 dark:bg-emerald-900 dark:text-emerald-100"
                           >
@@ -276,7 +421,7 @@ export default function WebAccessControlPage() {
                                 <Edit className="h-4 w-4 mr-2" />
                                 Edit
                               </DropdownMenuItem>
-                              <DropdownMenuItem 
+                              <DropdownMenuItem
                                 onClick={() => deleteMutation.mutate(url.id)}
                                 className="text-destructive"
                               >
@@ -318,8 +463,8 @@ export default function WebAccessControlPage() {
               <Button variant="outline" onClick={() => setEditUrl(null)}>
                 Cancel
               </Button>
-              <Button 
-                onClick={handleUpdate} 
+              <Button
+                onClick={handleUpdate}
                 disabled={updateMutation.isPending || !formData.url.trim()}
               >
                 {updateMutation.isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}

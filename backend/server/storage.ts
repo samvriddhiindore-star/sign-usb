@@ -1109,12 +1109,16 @@ class DatabaseStorage implements IStorage {
 
   async createUrl(url: InsertUrlMaster): Promise<UrlMaster> {
     const urlUid = randomUUID();
-    const result = await db.insert(urlMaster).values({
+    const result: any = await db.insert(urlMaster).values({
       ...url,
       urlUid
     });
-    const insertedId = (result as any).insertId as number | undefined;
-    if (!insertedId) throw new Error("Failed to create URL");
+    // Handle both array (mysql2) and object return types
+    const insertedId = (Array.isArray(result) ? result[0].insertId : result.insertId) as number | undefined;
+    if (!insertedId) {
+      console.error("Failed to create URL, result:", result);
+      throw new Error("Failed to create URL");
+    }
     const created = await db.select().from(urlMaster).where(eq(urlMaster.id, insertedId)).limit(1);
     if (!created[0]) throw new Error("Failed to retrieve created URL");
     return created[0];
@@ -1127,11 +1131,48 @@ class DatabaseStorage implements IStorage {
   }
 
   async deleteUrl(id: number): Promise<boolean> {
-    const result = await db.delete(urlMaster).where(eq(urlMaster.id, id));
-    return (result as any).affectedRows !== undefined ? (result as any).affectedRows > 0 : true;
+    const result: any = await db.delete(urlMaster).where(eq(urlMaster.id, id));
+    // Handle both array (mysql2) and object return types
+    const affectedRows = (Array.isArray(result) ? result[0].affectedRows : result.affectedRows) as number | undefined;
+    return (affectedRows || 0) > 0;
   }
 
-  // ==================== DEVICE MASTER METHODS ====================
+  async createBulkUrls(urls: string[], access: string = 'allowed'): Promise<{ success: number; failed: number; errors: string[] }> {
+    let success = 0;
+    let failed = 0;
+    const errors: string[] = [];
+
+    for (const url of urls) {
+      const trimmedUrl = url.trim();
+      if (!trimmedUrl) continue; // Skip empty lines
+
+      try {
+        const urlUid = randomUUID();
+        await db.insert(urlMaster).values({
+          url: trimmedUrl,
+          urlUid,
+          remark: access
+        });
+        success++;
+      } catch (error: any) {
+        failed++;
+        errors.push(`Failed to add "${trimmedUrl}": ${error.message || 'Unknown error'}`);
+      }
+    }
+
+    return { success, failed, errors };
+  }
+
+  async deleteBulkUrls(ids: number[]): Promise<{ deleted: number }> {
+    if (ids.length === 0) return { deleted: 0 };
+
+    const result: any = await db.delete(urlMaster).where(inArray(urlMaster.id, ids));
+    // Handle both array (mysql2) and object return types
+    const affectedRows = (Array.isArray(result) ? result[0].affectedRows : result.affectedRows) as number | undefined;
+    const deleted = affectedRows ?? ids.length;
+    return { deleted };
+  }
+
   async getDevices(): Promise<(DeviceMasterWithDescription & { pcName?: string })[]> {
     const result = await db
       .select({

@@ -1103,6 +1103,47 @@ export async function registerRoutes(
     }
   });
 
+  // Bulk URL creation
+  app.post("/api/urls/bulk", authMiddleware, async (req, res) => {
+    try {
+      const schema = z.object({
+        urls: z.array(z.string()).min(1, "At least one URL is required")
+      });
+
+      const data = schema.parse(req.body);
+      const result = await storage.createBulkUrls(data.urls, 'allowed');
+
+      res.status(201).json({
+        success: result.success,
+        failed: result.failed,
+        errors: result.errors,
+        message: `Successfully added ${result.success} URL(s)${result.failed > 0 ? `, ${result.failed} failed` : ''}`
+      });
+    } catch (error: any) {
+      res.status(400).json({ error: error.message });
+    }
+  });
+
+  // Bulk URL deletion
+  app.delete("/api/urls/bulk", authMiddleware, async (req, res) => {
+    try {
+      const schema = z.object({
+        ids: z.array(z.number()).min(1, "At least one URL ID is required")
+      });
+
+      const data = schema.parse(req.body);
+      const result = await storage.deleteBulkUrls(data.ids);
+
+      res.json({
+        success: true,
+        deleted: result.deleted,
+        message: `Successfully deleted ${result.deleted} URL(s)`
+      });
+    } catch (error: any) {
+      res.status(400).json({ error: error.message });
+    }
+  });
+
   app.get("/api/urls/:id", authMiddleware, async (req, res) => {
     try {
       const id = parseInt(req.params.id);
@@ -1190,7 +1231,9 @@ export async function registerRoutes(
     }
   });
 
-  // ==================== DEVICE MASTER (USB Device Registry) ====================
+
+
+
   app.get("/api/devices", authMiddleware, async (req, res) => {
     try {
       const devices = await storage.getDevices();
